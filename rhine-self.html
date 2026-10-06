@@ -1,0 +1,3269 @@
+<!DOCTYPE html>
+<!-- 单文件版：由 tools/build-single.mjs 生成，改内容请回到 js/data.js -->
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RHINE LAB · 个人信息终端</title>
+<meta name="description" content="莱茵生命风格的个人介绍终端 —— 分幕滚动 · 薄片无限造型 · HUD 动效">
+<meta name="theme-color" content="#eceae7">
+
+<!--
+  字体说明（详见 css/fonts.css）：
+    · 默认走本机字体（Rhine Mono = JetBrains Mono / Cascadia Mono / Consolas…），
+      零网络请求，离线与国内访问都稳。
+    · 想换成 Web 字体（Michroma / Oswald / Chakra Petch / Noto Sans SC）：
+      把字体文件放进 ./fonts/，取消 css/fonts.css 里 @font-face 的注释即可，
+      无需改动本文件。
+-->
+
+<!--
+  开一张保险：如果下面那些脚本因为任何原因没跑起来（比如构建时被改坏了），
+  页面会永远停在开场层、什么都不显示 —— 这里兜一个 4 秒后的提示，
+  让人至少知道是脚本没执行，而不是"页面就是这样的"。
+-->
+<script>
+  window.setTimeout(function () {
+    if (window.RHINE && window.RHINE.ready) return;
+    var msg = window.__RHINE_ERR__ || '（没有捕获到具体错误）';
+    var d = document.createElement('div');
+    d.setAttribute('role', 'alert');
+    d.style.cssText = 'position:fixed;left:16px;bottom:16px;z-index:9999;max-width:70ch;' +
+      'padding:12px 14px;font:12px/1.7 monospace;color:#fff;background:#eb7510';
+    d.textContent = '脚本没有执行：页面停在开场层。错误信息 → ' + msg;
+    (document.body || document.documentElement).appendChild(d);
+  }, 4000);
+</script>
+<style>
+/* ===== css/fonts.css ===== */
+/* ============================================================
+ *  本地字体（默认走系统自带，零网络依赖）
+ *  ────────────────────────────────────────────────────────────
+ *  为什么这么做：这个页面要挂到 GitHub Pages 给别人看，外链字体
+ *  在国内可能加载很慢甚至加载不出来。系统字体零延迟、零请求。
+ *
+ *  想要更接近宣传片的拉丁字形？两个办法，任选其一：
+ *
+ *  A. 换系统字体：把下面的 system-ui 换成已装的字体名，例如
+ *     "Bahnschrift"（Win10+ 自带，DIN 味）或 "Michroma"（若已安装）。
+ *
+ *  B. 自托管 Web 字体（推荐 Michroma + Oswald + Chakra Petch + Noto Sans SC）：
+ *     1) 打开 https://fonts.google.com/ ，选好字重后点 "Get font" → "Download all"
+ *     2) 把解压出来的 .ttf / .woff2 放进 ./fonts/
+ *     3) 取消下面 @font-face 段的注释，并把 family 名改成你的文件名
+ *     4) 在 index.html 里删掉 Google Fonts 的 <link>（如果有）
+ * ============================================================ */
+
+/* 拉丁显示字：用于大标题、机构名 —— 优先窄体/延展几何无衬线 */
+@font-face {
+  font-family: "Rhine Display";
+  src: local("Bahnschrift SemiBold"), local("Bahnschrift"),
+       local("Oswald"), local("Michroma"),
+       local("Segoe UI Semibold"), local("Segoe UI");
+  font-weight: 300 800;
+  font-display: swap;
+}
+
+/* 等宽数据字：用于编号、时间、参数 —— 系统等宽梯队 */
+@font-face {
+  font-family: "Rhine Mono";
+  src: local("JetBrains Mono"), local("Cascadia Mono"),
+       local("Cascadia Code"), local("Consolas"),
+       local("SFMono-Regular"), local("Menlo"), local("DejaVu Sans Mono");
+  font-weight: 300 800;
+  font-display: swap;
+}
+
+/* ── 自托管示例（把文件放进 ./fonts/ 后取消注释） ──────────────
+@font-face {
+  font-family: "Rhine Display";
+  src: url("../fonts/Michroma-Regular.woff2") format("woff2");
+  font-weight: 400; font-display: swap;
+}
+@font-face {
+  font-family: "Rhine Mono";
+  src: url("../fonts/ChakraPetch-Medium.woff2") format("woff2");
+  font-weight: 500; font-display: swap;
+}
+@font-face {
+  font-family: "Rhine CN";
+  src: url("../fonts/NotoSansSC-Regular.woff2") format("woff2");
+  font-weight: 400; font-display: swap;
+}
+──────────────────────────────────────────────────────────── */
+
+/* ===== css/style.css ===== */
+/* ============================================================
+ *  RHINE LAB · 个人终端样式表
+ *  ── 目录 ─────────────────────────────────────────────────
+ *  01  主题变量（明 / 暗两套）
+ *  02  基础重置与排版
+ *  03  背景层：画布 / 光晕 / 纹理 / 网格 / 注册标记
+ *  04  顶部栏与时钟
+ *  05  左侧刻度导航
+ *  06  分幕舞台与入场动效
+ *  07  右侧操作员档案卡
+ *  08  底部状态栏
+ *  09  节点标签
+ *  10  开场引导层
+ *  11  通用组件（按钮 / 徽章 / 进度条）
+ *  12  响应式
+ * ============================================================ */
+
+/* ── 01 主题变量 ──────────────────────────────────────────── */
+:root {
+  --font-mono: "Rhine Mono", "JetBrains Mono", "Cascadia Mono", "Cascadia Code",
+               Consolas, "SFMono-Regular", "Liberation Mono", Menlo, monospace;
+  --font-display: "Rhine Display", "Bahnschrift", "Oswald", "Segoe UI",
+                  system-ui, sans-serif;
+  --font-cn: "Rhine CN", "Noto Sans SC", "Source Han Sans SC", "PingFang SC",
+             "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+
+  --step: 0.055em;          /* 等宽字的字距，接近宣传片观感 */
+  --gap: clamp(14px, 1.8vw, 26px);
+  --pad: clamp(16px, 2.5vw, 46px);
+  --pad-y: clamp(22px, 5vh, 56px);
+  --hair: 1px;
+  --ease: cubic-bezier(0.16, 0.84, 0.3, 1);
+  --ease-soft: cubic-bezier(0.4, 0, 0.2, 1);
+  --dur: 480ms;
+}
+
+/* 色值从参考录屏的帧里直接量出来：纸底灰阶 193~214（≈#D5D7CE）／∞ 亮面 227~237／
+   肋线 160。所以纸底必须比雕塑明显更深，雕塑才立得起来 —— 这是对着视频定标的结果。 */
+html[data-theme="light"] {
+  --bg:        #d5d7ce;
+  --bg-deep:   #c9ccc2;
+  --panel:     #ffffff;
+  --panel-2:   #e2e4db;
+  --ink:       #0a0a0a;
+  --ink-soft:  #5b5651;
+  --ink-faint: #9a938c;
+  --line:      rgba(10, 10, 10, 0.17);
+  --line-2:    rgba(10, 10, 10, 0.08);
+  --line-3:    rgba(10, 10, 10, 0.032);
+
+  --accent:      #eb7510;
+  --accent-ink:  #ffffff;
+  --accent-soft: rgba(235, 117, 16, 0.14);
+
+  --card-bg:     rgba(255, 255, 255, 0.86);
+  --card-solid:  #ffffff;
+  --portrait-bg: #eae5df;
+  --portrait-ink:#171717;
+
+  /* 背景 ∞ 雕塑用的灰阶：参考录屏里是近白实体（面片 218~248、肋线 140~178） */
+  --rib-lo:   108, 105, 100;
+  --rib-hi:   255, 255, 255;
+  --rib-alpha: 0.88;
+  --vignette: rgba(213, 215, 206, 0.55);
+  --bloom:    radial-gradient(46% 40% at 50% 46%, rgba(255,255,255,.85), rgba(255,255,255,0) 70%);
+  --grid-tint: rgba(10, 10, 10, 0.055);
+  --grain-mix: multiply;
+  color-scheme: light;
+}
+
+html[data-theme="dark"] {
+  --bg:        #111214;
+  --bg-deep:   #08090a;
+  --panel:     #17191c;
+  --panel-2:   #1d2024;
+  --ink:       #f2f3f4;
+  --ink-soft:  #a3a7ad;
+  --ink-faint: #6d7278;
+  --line:      rgba(242, 243, 244, 0.19);
+  --line-2:    rgba(242, 243, 244, 0.09);
+  --line-3:    rgba(242, 243, 244, 0.035);
+
+  --accent:      #ff8524;
+  --accent-ink:  #10100f;
+  --accent-soft: rgba(255, 133, 36, 0.16);
+
+  --card-bg:     rgba(23, 25, 28, 0.82);
+  --card-solid:  #17191c;
+  --portrait-bg: #101214;
+  --portrait-ink:#e8eaec;
+
+  --rib-lo:   8,   8,   9;
+  --rib-hi:   255, 252, 246;
+  --rib-alpha: 0.40;
+  --vignette: rgba(10, 11, 12, 0.66);
+  --bloom:    radial-gradient(48% 42% at 50% 46%, rgba(255,133,36,.10), rgba(0,0,0,0) 72%);
+  --grid-tint: rgba(242, 243, 244, 0.05);
+  --grain-mix: overlay;
+  color-scheme: dark;
+}
+
+/* ── 02 基础 ─────────────────────────────────────────────── */
+* { box-sizing: border-box; }
+
+html {
+  scroll-behavior: smooth;
+  /* 整页按"幕"吸附：一次滑动只落在五幕之一，不会停在两幕中间 */
+  scroll-snap-type: y mandatory;
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.62;
+  letter-spacing: var(--step);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  transition: background var(--dur) var(--ease-soft), color var(--dur) var(--ease-soft);
+}
+
+::selection { background: var(--accent); color: var(--accent-ink); }
+
+h1, h2, h3, p, ul, ol, figure { margin: 0; }
+ul, ol { padding: 0; list-style: none; }
+b, strong { font-weight: 500; }
+
+button { font: inherit; letter-spacing: var(--step); cursor: pointer; }
+a { color: inherit; text-decoration: none; }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* 自定义滚动条（桌面 WebKit / Blink） */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--accent); background-clip: content-box; }
+
+/* 全站细描边工具类 */
+.hair { border-top: var(--hair) solid var(--line); }
+.mono-cap {
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+/* ── 03 背景层 ───────────────────────────────────────────── */
+#ribbon {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  display: block;
+}
+
+.bg-bloom {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  /* 默认关掉：这层白色柔光会把画布上的丝带洗淡。想要"过曝"感就改回 radial-gradient */
+  background-image: none;
+  transition: background-image var(--dur) var(--ease-soft);
+}
+
+/* 暗角：原本画在 canvas 上，但 canvas 里的颜色没法参与 CSS 过渡，
+   明暗切换时会硬切一下；挪到 DOM 上就跟着 --vignette 一起渐变。 */
+.bg-vignette {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background-image: radial-gradient(120% 105% at 50% 48.5%,
+    rgba(0, 0, 0, 0) 18%, var(--vignette) 92%);
+}
+
+/* ── 明暗主题的渐变过渡 ─────────────────────────────────────
+ * 首选 View Transitions（Chromium）：整页做一次交叉淡入淡出，
+ * 连 canvas 上的 ∞ 雕塑也一起过渡。不支持的浏览器走 .theme-tween 兜底。 */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 560ms;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  mix-blend-mode: normal;
+}
+
+/* 兜底：只在切换的那一小段时间里给主题色加过渡，避免影响常规交互动效 */
+html.theme-tween,
+html.theme-tween body,
+html.theme-tween body *:not(canvas) {
+  transition: background-color 460ms var(--ease-soft),
+              color 460ms var(--ease-soft),
+              border-color 460ms var(--ease-soft),
+              box-shadow 460ms var(--ease-soft) !important;
+}
+
+.texture {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0.42;
+  mix-blend-mode: var(--grain-mix);
+  background-image: url("data:image/svg+xml;utf8,\
+<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'>\
+<filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/>\
+<feColorMatrix type='saturate' values='0'/></filter>\
+<rect width='180' height='180' filter='url(%23n)' opacity='0.5'/></svg>");
+}
+
+.grid-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0.9;
+  background-image:
+    linear-gradient(var(--grid-tint) var(--hair), transparent var(--hair)),
+    linear-gradient(90deg, var(--grid-tint) var(--hair), transparent var(--hair)),
+    linear-gradient(var(--line-3) var(--hair), transparent var(--hair)),
+    linear-gradient(90deg, var(--line-3) var(--hair), transparent var(--hair));
+  background-size: 120px 120px, 120px 120px, 24px 24px, 24px 24px;
+  mask-image: radial-gradient(120% 88% at 50% 42%, #000 26%, transparent 82%);
+  -webkit-mask-image: radial-gradient(120% 88% at 50% 42%, #000 26%, transparent 82%);
+}
+
+.regmark {
+  position: fixed;
+  z-index: 6;
+  width: 13px;
+  height: 13px;
+  pointer-events: none;
+  opacity: 0.62;
+  background:
+    linear-gradient(var(--ink) 0 0) center / 100% var(--hair) no-repeat,
+    linear-gradient(var(--ink) 0 0) center / var(--hair) 100% no-repeat;
+  transition: opacity var(--dur) var(--ease-soft);
+}
+.regmark--tl { left: 16px;  top: 16px; }
+.regmark--tr { right: 16px; top: 16px; }
+.regmark--bl { left: 16px;  bottom: 16px; }
+.regmark--br { right: 16px; bottom: 16px; }
+
+/* 点阵装饰：右下角一小块数据格 */
+.card__idrow .portrait svg { color: var(--portrait-ink); }
+
+/* ── 04 顶部栏 ───────────────────────────────────────────── */
+.topbar {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 8;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--gap);
+  padding: 20px var(--pad) 14px;
+  pointer-events: none;
+}
+.topbar > * { pointer-events: auto; }
+
+.topbar__brand { display: flex; align-items: center; gap: 10px; }
+
+.glyph {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  color: var(--ink);
+  transition: transform 900ms var(--ease), color var(--dur) var(--ease-soft);
+}
+.topbar__brand:hover .glyph { transform: rotate(90deg); }
+
+.topbar__lab {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+}
+.topbar__sub {
+  font-size: 9.5px;
+  letter-spacing: 0.22em;
+  color: var(--ink-faint);
+  padding-left: 10px;
+  border-left: var(--hair) solid var(--line);
+}
+
+.topbar__mid {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  padding-top: 3px;
+}
+@media (max-width: 1180px) { .topbar__mid { display: none; } }
+
+.topbar__right { display: flex; align-items: flex-start; gap: 14px; }
+
+.clock { text-align: right; line-height: 1; }
+.clock__time {
+  font-size: clamp(28px, 3.2vw, 46px);
+  font-weight: 300;
+  letter-spacing: 0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.clock__meta {
+  margin-top: 7px;
+  font-size: 9.5px;
+  letter-spacing: 0.2em;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+}
+.clock__meta .dot { color: var(--accent); padding: 0 2px; }
+
+.clock__ticks {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+  margin-top: 8px;
+  height: 5px;
+}
+.clock__ticks i {
+  width: 7px;
+  height: 3px;
+  background: var(--line);
+  transition: background 320ms var(--ease-soft), height 320ms var(--ease-soft);
+}
+.clock__ticks i.is-past { background: var(--line); opacity: 0.9; }
+.clock__ticks i.is-today { background: var(--accent); height: 5px; }
+
+.iconbtn {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  background: transparent;
+  color: var(--ink);
+  border: var(--hair) solid var(--line);
+  transition: border-color 200ms var(--ease-soft), background 200ms var(--ease-soft),
+              color 200ms var(--ease-soft), transform 260ms var(--ease);
+}
+.iconbtn svg { width: 17px; height: 17px; }
+.iconbtn:hover { border-color: var(--accent); color: var(--accent); }
+.iconbtn:active { transform: scale(0.94); }
+html[data-theme="light"] .iconbtn svg circle { fill: currentColor; }
+html[data-theme="dark"] .iconbtn svg circle { fill: none; }
+
+/* ── 05 左侧刻度导航 ─────────────────────────────────────── */
+.rail {
+  position: fixed;
+  left: var(--pad);
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 7;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  mix-blend-mode: normal;
+}
+/* 窗口不够宽时收起刻度，避免压住标题 */
+@media (max-width: 1199px) {
+  .rail { display: none; }
+}
+
+.rail__item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: none;
+  border: 0;
+  padding: 3px 0;
+  color: var(--ink-faint);
+  transition: color 300ms var(--ease-soft);
+}
+.rail__tick {
+  width: 16px;
+  height: var(--hair);
+  background: currentColor;
+  transition: width 420ms var(--ease), background 300ms var(--ease-soft);
+}
+.rail__code {
+  font-size: 9.5px;
+  letter-spacing: 0.18em;
+  opacity: 0;
+  transform: translateX(-5px);
+  transition: opacity 320ms var(--ease-soft), transform 320ms var(--ease);
+}
+.rail__cn {
+  font-family: var(--font-cn);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  opacity: 0;
+  transform: translateX(-5px);
+  transition: opacity 320ms var(--ease-soft) 40ms, transform 320ms var(--ease) 40ms;
+}
+.rail__item:hover { color: var(--ink); }
+.rail__item:hover .rail__code,
+.rail__item:hover .rail__cn { opacity: 0.7; transform: none; }
+.rail__item.is-active { color: var(--accent); }
+.rail__item.is-active .rail__tick { width: 40px; background: var(--accent); }
+.rail__item.is-active .rail__code,
+.rail__item.is-active .rail__cn { opacity: 1; transform: none; }
+
+/* ── 06 分幕舞台 ─────────────────────────────────────────── */
+.stage {
+  position: relative;
+  z-index: 4;
+  padding: 0 var(--pad);
+  max-width: 1560px;
+  margin: 0 auto;
+}
+
+/* 四栏：左参数 / 中标题 / 让位（空）/ 右侧给固定档案卡留位置 —— 标题永远不会被卡片压住 */
+.panel {
+  position: relative;
+  min-height: 100svh;
+  display: grid;
+  grid-template-columns:
+    minmax(190px, 0.85fr)
+    minmax(0, 1.55fr)
+    minmax(300px, 400px)
+    minmax(300px, 400px);
+  align-items: center;
+  gap: var(--gap);
+  padding: 92px 0 112px;
+  /* 每一幕就是一个吸附点；scroll-snap-stop 保证一次手势不跨幕 */
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+@media (max-width: 1199px) {
+  .panel {
+    grid-template-columns: minmax(150px, 0.68fr) minmax(0, 1fr) minmax(0, 340px);
+  }
+  .panel__spacer { display: none; }
+}
+@media (max-width: 1000px) {
+  .panel {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 104px 0 84px;
+  }
+}
+
+/* 幕与幕之间的横向分隔线 + 大量留白，营造"翻页"感 */
+.panel + .panel::before {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  border-top: var(--hair) solid var(--line-2);
+}
+
+/* 左栏：参数行 */
+.panel__side { align-self: center; }
+@media (max-width: 1000px) {
+  .panel__side { order: 3; margin-top: 26px; }
+}
+
+.side__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.side__head .rule { flex: 1; height: var(--hair); background: var(--line-2); }
+
+.side__row {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: 12px;
+  padding: 7px 0;
+  border-top: var(--hair) solid var(--line-2);
+  font-size: 11.5px;
+  min-width: 0;
+}
+.side__row:first-of-type { border-top: 0; }
+.side__k { color: var(--ink-faint); letter-spacing: 0.16em; text-transform: uppercase; }
+/* 值可能很长（比如网址）：必须允许它在自己的格子里换行，
+   否则 grid 的 min-content 会把整列撑宽，长网址直接压到大标题上。 */
+.side__v { color: var(--ink); min-width: 0; overflow-wrap: anywhere; }
+.side__row.is-link .side__v { border-bottom: var(--hair) solid var(--line); width: fit-content; }
+.side__row.is-link:hover .side__v { color: var(--accent); border-color: var(--accent); }
+
+/* 中栏：主标题 */
+.panel__main { position: relative; }
+.panel__label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.panel__label .idx {
+  color: var(--accent);
+  font-size: 10px;
+  letter-spacing: 0.24em;
+}
+.panel__title {
+  font-family: var(--font-display), var(--font-cn);
+  font-weight: 700;
+  font-size: clamp(26px, 3.1vw, 54px);
+  line-height: 1.16;
+  letter-spacing: 0.02em;
+  max-width: 560px;
+}
+.panel__title span { display: block; }
+.panel__title span:last-child { color: var(--ink); }
+.panel__title span:first-child { color: var(--ink-soft); }
+.panel__sub {
+  margin-top: 18px;
+  font-size: 10px;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.panel__rule {
+  margin-top: 22px;
+  height: 3px;
+  display: flex;
+  gap: 4px;
+}
+.panel__rule i { width: 22px; height: 3px; background: var(--line); }
+.panel__rule i:first-child { background: var(--accent); width: 44px; }
+
+/* 首屏多一个滚动提示 */
+.scrollcue {
+  margin-top: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 9.5px;
+  letter-spacing: 0.24em;
+  color: var(--ink-faint);
+}
+.scrollcue i {
+  display: block;
+  width: var(--hair);
+  height: 26px;
+  background: linear-gradient(var(--accent), transparent);
+  animation: cue 2.4s var(--ease-soft) infinite;
+}
+@keyframes cue {
+  0%, 100% { opacity: 0.25; transform: scaleY(0.6); transform-origin: top; }
+  45%      { opacity: 1;    transform: scaleY(1);   transform-origin: top; }
+}
+
+/* 入场动效：父级 .is-live 时子元素依次浮现 */
+[data-anim] {
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity 720ms var(--ease-soft), transform 720ms var(--ease);
+  transition-delay: var(--d, 0ms);
+}
+.panel.is-live [data-anim] { opacity: 1; transform: none; }
+
+/* 主标题的扫描线刷过 */
+.panel__title { position: relative; overflow: hidden; }
+.panel__title::after {
+  content: "";
+  position: absolute;
+  left: -12%; right: -12%;
+  top: 0;
+  height: 26%;
+  background: linear-gradient(180deg, transparent, var(--accent-soft) 45%, transparent);
+  opacity: 0;
+  pointer-events: none;
+}
+.panel.is-live .panel__title::after { animation: sweep 1100ms var(--ease-soft) 260ms 1; }
+@keyframes sweep {
+  0%   { opacity: 0; transform: translateY(-120%); }
+  18%  { opacity: 1; }
+  100% { opacity: 0; transform: translateY(360%); }
+}
+
+/* 打字机光标 */
+.tw::after {
+  content: "";
+  display: inline-block;
+  width: 0.5em;
+  height: 1em;
+  margin-left: 0.12em;
+  background: var(--accent);
+  vertical-align: -0.12em;
+  animation: blink 1.05s steps(1, end) infinite;
+}
+@keyframes blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+
+/* 右栏占位：桌面端给档案卡让出空间 */
+.panel__spacer { min-height: 1px; }
+@media (max-width: 1000px) { .panel__spacer { display: none; } }
+
+/* ── 07 右侧档案卡 ───────────────────────────────────────── */
+.card {
+  position: fixed;
+  z-index: 7;
+  right: var(--pad);
+  top: 50%;
+  transform: translateY(-50%);
+  width: min(392px, 34vw);
+  min-width: 300px;
+  max-width: 392px;
+  padding: 16px 18px 14px;
+  background: var(--card-bg);
+  border: var(--hair) solid var(--line);
+  backdrop-filter: blur(9px) saturate(115%);
+  -webkit-backdrop-filter: blur(9px) saturate(115%);
+  box-shadow: 0 1px 0 var(--line-2), 0 26px 60px -44px rgba(0, 0, 0, 0.55);
+  transition: background var(--dur) var(--ease-soft), border-color var(--dur) var(--ease-soft);
+}
+@media (max-width: 1000px) {
+  .card {
+    left: var(--pad);
+    right: var(--pad);
+    top: auto;
+    bottom: 46px;
+    width: auto;
+    transform: none;
+    max-height: 46svh;
+    overflow: hidden;
+  }
+  .card:not(.is-open) { display: none; }
+}
+@media (max-width: 1000px) {
+  .card.is-open { animation: sheet 380ms var(--ease) both; }
+  @keyframes sheet {
+    from { opacity: 0; transform: translateY(18px); }
+    to   { opacity: 1; transform: none; }
+  }
+}
+
+/* 切换板块时刷过一道亮线 */
+.card__scan {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent, var(--accent) 50%, transparent);
+  opacity: 0;
+  mix-blend-mode: normal;
+}
+.card.is-flash .card__scan { animation: cardscan 620ms var(--ease-soft) 1; }
+@keyframes cardscan {
+  0%   { opacity: 0; transform: translateY(-100%) scaleY(0.08); }
+  30%  { opacity: 0.55; }
+  100% { opacity: 0; transform: translateY(100%) scaleY(0.08); }
+}
+
+.card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: var(--hair) solid var(--line);
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  color: var(--ink-soft);
+}
+.card__head-t::before {
+  content: "";
+  display: inline-block;
+  width: 5px; height: 5px;
+  margin-right: 7px;
+  background: var(--accent);
+  vertical-align: 1px;
+}
+.card__head-r { color: var(--ink-faint); font-size: 8.5px; }
+
+.card__idrow {
+  display: grid;
+  grid-template-columns: 118px 1fr;
+  gap: 14px;
+  padding: 14px 0 12px;
+  border-bottom: var(--hair) solid var(--line);
+}
+
+.portrait {
+  position: relative;
+  aspect-ratio: 118 / 132;
+  background: var(--portrait-bg);
+  border: var(--hair) solid var(--line-2);
+  overflow: hidden;
+}
+.portrait svg { width: 100%; height: 100%; display: block; }
+.portrait__label {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  padding: 3px 6px;
+  font-size: 8.5px;
+  letter-spacing: 0.22em;
+  text-align: center;
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.opbox { display: flex; flex-direction: column; gap: 6px; }
+.opbox__k {
+  font-size: 9px;
+  letter-spacing: 0.24em;
+  color: var(--ink-faint);
+}
+.opbox__v {
+  font-size: clamp(26px, 2.6vw, 40px);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.03em;
+  word-break: break-word;
+}
+.opbox__badge {
+  margin-top: 2px;
+  font-size: 9.5px;
+  letter-spacing: 0.18em;
+  color: var(--ink-soft);
+}
+.opbox__badge b { color: var(--accent); }
+
+.card__metarow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 12px 0;
+  border-bottom: var(--hair) solid var(--line);
+}
+
+.card__row {
+  padding: 12px 0;
+  border-bottom: var(--hair) solid var(--line);
+  display: grid;
+  gap: 2px;
+}
+.card__row h4 {
+  font-size: 9px;
+  font-weight: 400;
+  letter-spacing: 0.24em;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+}
+.card__row dl {
+  margin: 4px 0 0;
+  display: grid;
+  grid-template-columns: 84px 1fr;
+  gap: 4px 10px;
+  font-size: 11.5px;
+}
+.card__row dt { color: var(--ink-faint); letter-spacing: 0.14em; }
+.card__row dd { margin: 0; color: var(--ink); }
+.card__row dd.is-gain { animation: gain 520ms var(--ease) both; }
+@keyframes gain {
+  from { opacity: 0; transform: translateX(-6px); color: var(--accent); }
+  to   { opacity: 1; transform: none; }
+}
+
+.card__foot {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  padding-top: 12px;
+}
+.card__foot-l { flex: 1; min-width: 0; }
+.foot-k {
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  color: var(--ink-faint);
+}
+.keybar {
+  margin-top: 5px;
+  padding: 7px 9px;
+  border: var(--hair) solid var(--line);
+  background: var(--panel-2);
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+}
+/* 真正可点的输入框：整条 keybar 就是输入区，点哪儿都能直接打字 */
+.keybar__input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  color: var(--ink);
+  text-transform: uppercase;
+  padding: 0;
+  cursor: text;
+}
+.keybar__input::placeholder {
+  color: var(--ink-faint);
+  text-transform: none;
+  letter-spacing: 0.1em;
+  opacity: 1;
+}
+.keybar:focus-within { border-color: var(--accent); }
+.keybar:focus-within .keybar__input { color: var(--accent); }
+/* 点空白处也聚焦到输入框（整条都是输入区） */
+.keybar { cursor: text; }
+.keybar__input:disabled { cursor: default; }
+
+@media (max-width: 420px) {
+  .card__idrow { grid-template-columns: 88px 1fr; }
+  .card__row dl { grid-template-columns: 70px 1fr; }
+}
+
+/* ── 08 底部状态栏 ───────────────────────────────────────── */
+.botbar {
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px var(--pad) 18px;
+  border-top: var(--hair) solid var(--line-2);
+  background: linear-gradient(180deg, transparent, var(--bg) 62%);
+  pointer-events: none;
+}
+.botbar > * { pointer-events: auto; }
+@media (max-width: 1000px) {
+  .botbar { flex-direction: column; align-items: flex-start; gap: 6px; padding-bottom: 62px; }
+  .botbar__right { flex-wrap: wrap; }
+}
+
+.botbar__title {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+}
+.botbar__center {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.botbar__cn {
+  font-family: var(--font-cn);
+  font-size: 12px;
+  color: var(--ink);
+  letter-spacing: 0.1em;
+}
+.botbar__en {
+  font-size: 8.5px;
+  letter-spacing: 0.26em;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+}
+.botbar__right { display: flex; align-items: center; gap: 12px; }
+.sep { width: var(--hair); height: 12px; background: var(--line); }
+
+.linkbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--ink-soft);
+  font-size: 9.5px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  transition: color 200ms var(--ease-soft);
+}
+.linkbtn b { color: var(--ink); font-weight: 500; }
+.linkbtn i { font-style: normal; font-size: 8px; color: var(--ink-faint); }
+.linkbtn:hover { color: var(--accent); }
+.linkbtn:hover b { color: var(--accent); }
+.linkbtn--static { cursor: default; }
+.linkbtn--static:hover, .linkbtn--static:hover b { color: var(--ink-soft); }
+
+.motion-dot {
+  width: 6px; height: 6px;
+  background: var(--accent);
+  animation: pulse 1.8s var(--ease-soft) infinite;
+}
+@keyframes pulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
+
+/* 移动端浮起的"档案"开关 */
+.cardtoggle {
+  display: none;
+  position: fixed;
+  z-index: 9;
+  right: var(--pad);
+  bottom: 52px;
+  padding: 9px 13px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  border: 0;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+}
+@media (max-width: 1000px) { .cardtoggle { display: block; } }
+
+/* ── 09 节点标签 ─────────────────────────────────────────── */
+.node-label {
+  position: fixed;
+  z-index: 5;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 8px;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  background: var(--accent);
+  color: var(--accent-ink);
+  opacity: 0;
+  transform: translate(-50%, -160%);
+  transition: opacity 220ms var(--ease-soft);
+  white-space: nowrap;
+}
+.node-label.is-on { opacity: 1; }
+.node-label__d { opacity: 0.72; }
+
+/* ── 10 开场引导层 ───────────────────────────────────────── */
+.boot {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  background: var(--bg);
+  transition: opacity 700ms var(--ease-soft), visibility 700ms;
+}
+.boot.is-done { opacity: 0; visibility: hidden; }
+.boot__inner {
+  width: min(460px, 82vw);
+  display: grid;
+  justify-items: start;
+  gap: 16px;
+}
+.boot__mark { color: var(--accent); }
+.boot__mark svg {
+  width: 40px; height: 40px;
+  animation: spin 6.5s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.boot__log {
+  width: 100%;
+  min-height: 108px;
+  font-size: 10.5px;
+  line-height: 1.85;
+  color: var(--ink-soft);
+  letter-spacing: 0.12em;
+}
+.boot__log b { color: var(--ink); font-weight: 500; }
+.boot__log .ok { color: var(--accent); }
+
+.boot__bar {
+  width: 100%;
+  height: 2px;
+  background: var(--line);
+  overflow: hidden;
+}
+.boot__bar i {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: var(--accent);
+  transition: width 260ms linear;
+}
+.boot__hint {
+  font-size: 9px;
+  letter-spacing: 0.28em;
+  color: var(--ink-faint);
+  opacity: 0;
+  transition: opacity 500ms var(--ease-soft);
+}
+.boot__hint.is-on { opacity: 1; }
+
+/* ── 11 通用组件 ─────────────────────────────────────────── */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  border: var(--hair) solid var(--line);
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+.tag b { color: var(--ink); font-weight: 500; }
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 7px;
+  font-size: 8.5px;
+  letter-spacing: 0.16em;
+  background: var(--panel-2);
+  color: var(--ink-soft);
+  text-transform: uppercase;
+}
+.pill b { color: var(--ink); font-weight: 500; }
+.pill__dot {
+  width: 5px; height: 5px;
+  background: var(--accent);
+  animation: pulse 2.2s var(--ease-soft) infinite;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 13px;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  border: var(--hair) solid var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
+  transition: background 240ms var(--ease-soft), color 240ms var(--ease-soft),
+              border-color 240ms var(--ease-soft);
+}
+.btn i { font-style: normal; transition: transform 380ms var(--ease); }
+.btn:hover i { transform: translateX(3px); }
+
+.keybtn.is-granted {
+  background: transparent;
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* ── 12 响应式与低动效偏好 ───────────────────────────────── */
+@media (max-width: 1000px) {
+  .topbar__sub { display: none; }
+  .clock__time { font-size: 28px; }
+  .panel__title { font-size: clamp(26px, 7vw, 38px); }
+  .side__row { grid-template-columns: 76px 1fr; }
+}
+
+/* 用户关闭动效 / 点了底部 ANIMATION:OFF */
+html.no-anim *,
+html.no-anim *::before,
+html.no-anim *::after {
+  animation: none !important;
+  transition-duration: 1ms !important;
+}
+html.no-anim [data-anim] { opacity: 1 !important; transform: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  [data-anim] { opacity: 1 !important; transform: none !important; }
+  .scrollcue i, .motion-dot, .pill__dot, .boot__mark svg { animation: none !important; }
+}
+
+/* ── 13 授权状态机：VERIFYING 细环 / WARNING 黑橙 / 事件日志 ────── */
+
+/* 验证细环：只在 verifying 状态出现，一圈约 850ms */
+.vring {
+  width: 0;
+  height: 15px;
+  flex: 0 0 auto;
+  opacity: 0;
+  overflow: hidden;
+  transition: width 260ms var(--ease-soft), opacity 260ms var(--ease-soft),
+              margin-right 260ms var(--ease-soft);
+}
+.vring__track { fill: none; stroke: var(--line); stroke-width: 1.4; }
+.vring__arc {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-dasharray: 0.22 0.78;
+  transform-origin: 12px 12px;
+  transform: rotate(-90deg);
+}
+html[data-state="verifying"] .vring { width: 15px; opacity: 1; margin-right: 8px; }
+html[data-state="verifying"] .vring__arc { animation: vspin 850ms linear infinite; }
+html[data-state="granted"] .vring { width: 15px; opacity: 1; margin-right: 8px; }
+html[data-state="granted"] .vring__arc {
+  stroke-dasharray: 1 0;
+  transform: rotate(-90deg) scale(0.92);
+}
+@keyframes vspin { to { transform: rotate(270deg); } }
+
+/* 口令框底部的细进度条（验证进度，不是整页进度） */
+.keybar { position: relative; }
+.keybar__bar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 1px;
+  width: 0;
+  background: var(--accent);
+  transition: width 120ms linear;
+}
+html[data-state="verifying"] .keybar__bar { transition: width 900ms cubic-bezier(0.3, 0, 0.4, 1); width: 100%; }
+html[data-state="granted"] .keybar__bar { width: 100%; }
+
+/* 警示态：内层整体硬切黑橙。切换要"硬"（0~90ms），不是渐变 */
+html[data-state="warning"] {
+  --bg:        #111510;
+  --bg-deep:   #0a0d09;
+  --panel:     #161a14;
+  --panel-2:   #1b2018;
+  --ink:       #f2ece2;
+  --ink-soft:  #b8ae9d;
+  --ink-faint: #7d7364;
+  --line:      rgba(232, 139, 57, 0.34);
+  --line-2:    rgba(232, 139, 57, 0.16);
+  --line-3:    rgba(232, 139, 57, 0.07);
+  --accent:      #e88b39;
+  --accent-soft: rgba(232, 139, 57, 0.16);
+  --card-bg:     rgba(22, 26, 20, 0.9);
+  --card-solid:  #161a14;
+  --portrait-bg: #0d100c;
+  --portrait-ink:#e8e2d6;
+  --rib-lo:   8, 8, 9;          /* 让 ∞ 也切到暗色档 → 雕塑被压暗 */
+  --vignette: rgba(17, 21, 16, 0.72);
+  --grid-tint: rgba(232, 139, 57, 0.07);
+  color-scheme: dark;
+}
+html[data-state="warning"] body {
+  transition: background-color 90ms linear, color 90ms linear;
+}
+
+/* 警示面板：黑底 + 橙色顶条 + 三角图标 */
+.warnpanel {
+  position: fixed;
+  left: 50%;
+  top: calc(var(--pad-y) + 46px);
+  transform: translateX(-50%);
+  z-index: 30;
+  width: min(430px, calc(100vw - 2 * var(--pad)));
+  background: #0c0f0b;
+  border: var(--hair) solid rgba(232, 139, 57, 0.55);
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.42);
+  color: #e88b39;
+  animation: warnin 140ms steps(3, end) both;
+}
+.warnpanel[hidden] { display: none; }
+.warnpanel__top { display: block; height: 3px; background: #e88b39; }
+.warnpanel__body {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 15px;
+}
+.warnpanel__icon { width: 26px; height: 26px; flex: 0 0 auto; color: #e88b39; }
+.warnpanel__txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.warnpanel__t {
+  font-family: var(--font-display);
+  font-size: 17px;
+  letter-spacing: 0.18em;
+  color: #f2ece2;
+}
+.warnpanel__s { font-size: 10.5px; letter-spacing: 0.1em; color: rgba(232, 139, 57, 0.92); }
+.warnpanel__tick {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: rgba(232, 139, 57, 0.72);
+  align-self: flex-start;
+  font-variant-numeric: tabular-nums;
+}
+@keyframes warnin {
+  from { opacity: 0; transform: translateX(-50%) translateY(-5px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* 事件日志：贴在左栏下方（窄屏隐藏，避免和标题抢位置） */
+.evtlog {
+  position: fixed;
+  left: var(--pad);
+  bottom: calc(var(--pad-y) + 54px);
+  z-index: 7;
+  width: 232px;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+}
+.evtlog__h {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-bottom: 5px;
+  border-bottom: var(--hair) solid var(--line-2);
+  color: var(--ink-faint);
+  font-size: 9px;
+  letter-spacing: 0.22em;
+}
+.evtlog__cn { letter-spacing: 0.1em; opacity: 0.75; }
+.evtlog__list { margin: 6px 0 0; display: flex; flex-direction: column; gap: 3px; }
+.evtlog__list li {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  color: var(--ink-soft);
+  animation: evtin 260ms var(--ease) both;
+}
+.evtlog__list li b { color: var(--ink-faint); font-weight: 400; font-variant-numeric: tabular-nums; }
+.evtlog__list li.is-deny { color: var(--accent); }
+.evtlog__list li.is-ok { color: var(--ink); }
+@keyframes evtin { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: none; } }
+
+@media (max-width: 999px) {
+  .evtlog { display: none; }
+}
+
+</style>
+</head>
+<body>
+
+<!-- ░░ 01 背景：薄片无限造型 ░░ -->
+<canvas id="ribbon" aria-hidden="true"></canvas>
+<div class="bg-bloom" aria-hidden="true"></div>
+<div class="bg-vignette" aria-hidden="true"></div>
+
+<!-- ░░ 02 固定层：纹理 / 网格 / 四角标记 ░░ -->
+<div class="texture" aria-hidden="true"></div>
+<div class="grid-veil" aria-hidden="true"></div>
+<div class="regmark regmark--tl" aria-hidden="true"></div>
+<div class="regmark regmark--tr" aria-hidden="true"></div>
+<div class="regmark regmark--bl" aria-hidden="true"></div>
+<div class="regmark regmark--br" aria-hidden="true"></div>
+
+<!-- ░░ 03 顶部栏 ░░ -->
+<header class="topbar">
+  <div class="topbar__brand">
+    <svg class="glyph" viewBox="0 0 100 100" aria-hidden="true">
+      <circle cx="50" cy="50" r="38" fill="none" stroke="currentColor" stroke-width="7"/>
+      <path d="M50 12v76M12 50h76" stroke="currentColor" stroke-width="7"/>
+      <path d="M50 50 78 22M50 50 22 78" stroke="currentColor" stroke-width="7"/>
+      <circle cx="50" cy="50" r="13" fill="var(--bg)"/>
+      <circle cx="50" cy="50" r="6" fill="currentColor"/>
+    </svg>
+    <span class="topbar__lab">RHINE LAB</span>
+    <span class="topbar__sub">PERSONAL TERMINAL</span>
+  </div>
+
+  <div class="topbar__mid">
+    <span class="tag tag--ghost">SPECIMEN <b id="tagSpecimen">A-01</b></span>
+    <span class="tag tag--ghost">DEEPSEEK <b id="tagOpus">FLASH</b></span>
+    <span class="tag tag--ghost" id="tagStatus">SIGNAL <b>STABLE</b></span>
+  </div>
+
+  <div class="topbar__right">
+    <div class="clock" id="clock">
+      <div class="clock__time" id="clockTime">--:--</div>
+      <div class="clock__meta">
+        <span id="clockWeek">---</span>
+        <span class="dot">·</span>
+        <span id="clockDate">-- --- ----</span>
+      </div>
+      <div class="clock__ticks" id="clockTicks" aria-hidden="true"></div>
+    </div>
+    <button class="iconbtn" id="themeBtn" type="button" aria-label="切换明暗主题" title="切换明暗主题">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2" fill="currentColor"/>
+        <g stroke="currentColor" stroke-width="1.4" stroke-linecap="square">
+          <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.2 5.2l2.1 2.1M16.7 16.7l2.1 2.1M18.8 5.2l-2.1 2.1M7.3 16.7l-2.1 2.1"/>
+        </g>
+      </svg>
+    </button>
+  </div>
+</header>
+
+<!-- ░░ 04 左侧导航刻度 ░░ -->
+<nav class="rail" id="rail" aria-label="章节导航"></nav>
+
+<!-- ░░ 04b 事件日志（对照参考录屏左侧日志） ░░ -->
+<section class="evtlog" id="evtLog" aria-label="事件日志">
+  <div class="evtlog__h"><span>EVENT LOG</span><span class="evtlog__cn">事件日志</span></div>
+  <ul class="evtlog__list" id="evtList"></ul>
+</section>
+
+<!-- ░░ 05 中央分幕舞台（由 data.js 渲染） ░░ -->
+<main class="stage" id="stage"></main>
+
+<!-- ░░ 06 右侧操作员档案卡 ░░ -->
+<aside class="card" id="card" aria-label="操作员档案">
+  <div class="card__scan" aria-hidden="true"></div>
+  <div class="card__head">
+    <span class="card__head-t">SECTION PROFILE</span>
+    <span class="card__head-r" id="cardSponsor">RHINE LAB LLC</span>
+  </div>
+
+  <div class="card__idrow">
+    <div class="portrait">
+      <svg viewBox="0 0 120 140" aria-hidden="true">
+        <defs>
+          <pattern id="dotpat" width="4" height="4" patternUnits="userSpaceOnUse">
+            <circle cx="1.2" cy="1.2" r="0.85" fill="currentColor" opacity=".55"/>
+          </pattern>
+        </defs>
+        <rect x="0" y="0" width="120" height="140" fill="url(#dotpat)" opacity=".5"/>
+        <path d="M60 34c-11 0-19 8-19 20 0 8 2 13 6 17-13 5-23 14-25 27h76c-2-13-12-22-25-27 4-4 6-9 6-17 0-12-8-20-19-20z"
+              fill="currentColor" opacity=".82"/>
+        <line x1="0" y1="118" x2="120" y2="118" stroke="currentColor" stroke-width="1" opacity=".4"/>
+      </svg>
+      <span class="portrait__label" id="portraitLabel">LOCKED</span>
+    </div>
+
+    <div class="opbox">
+      <span class="opbox__k">OPERATOR</span>
+      <span class="opbox__v" id="opName">XvShanzx</span>
+      <span class="opbox__badge">SECTION <b id="opSection">LIFE</b></span>
+    </div>
+  </div>
+
+  <div class="card__metarow">
+    <span class="pill"><i class="pill__dot"></i><b id="metaHost">LIFE-01</b> HOST</span>
+    <span class="pill">UPTIME <b id="metaUptime">00:00:00</b></span>
+  </div>
+
+  <div class="card__row" id="profileRows"></div>
+
+  <div class="card__foot">
+    <div class="card__foot-l">
+      <span class="foot-k">AUTHORIZATION KEY</span>
+      <div class="keybar">
+        <svg class="vring" id="vRing" viewBox="0 0 24 24" aria-hidden="true">
+          <circle class="vring__track" cx="12" cy="12" r="9"></circle>
+          <circle class="vring__arc" id="vArc" cx="12" cy="12" r="9" pathLength="1"></circle>
+        </svg>
+        <input id="keyInput" class="keybar__input" type="text" maxlength="18"
+               autocomplete="off" autocapitalize="characters" spellcheck="false"
+               aria-label="授权口令" placeholder="输入口令后回车">
+        <i class="keybar__bar" id="keyBar" aria-hidden="true"></i>
+      </div>
+    </div>
+    <button class="btn keybtn" id="keyBtn" type="button">REQUEST <i>→</i></button>
+  </div>
+</aside>
+
+<!-- ░░ 07 底部状态栏 ░░ -->
+<footer class="botbar">
+  <div class="botbar__left">
+    <span class="botbar__title" id="botTitle">LIFE · SEALED SECTION</span>
+  </div>
+  <div class="botbar__center">
+    <span class="botbar__cn" id="botCn">正在比对授权口令……</span>
+    <span class="botbar__en" id="botEn">CROSS-CHECKING AUTHORIZATION KEY</span>
+  </div>
+  <div class="botbar__right">
+    <button class="linkbtn" id="toTop" type="button"><i>▲</i> HIBERNATE</button>
+    <span class="sep"></span>
+    <button class="linkbtn" id="motionBtn" type="button"><i class="motion-dot"></i> ANIMATION <b id="motionState">ON</b></button>
+    <span class="sep"></span>
+    <span class="linkbtn linkbtn--static">POWERED BY <b>RHINE LAB</b></span>
+  </div>
+</footer>
+
+<!-- ░░ 08 鼠标悬停节点标签 ░░ -->
+<div class="node-label" id="nodeLabel" aria-hidden="true">
+  <span class="node-label__k">NODE</span>
+  <span class="node-label__v" id="nodeLabelId">000</span>
+  <span class="node-label__d" id="nodeLabelDepth">z 0.00</span>
+</div>
+
+<!-- ░░ 08b 警示面板（对照参考录屏的黑橙 WARNING） ░░ -->
+<div class="warnpanel" id="warnPanel" hidden role="alert" aria-live="assertive">
+  <i class="warnpanel__top" aria-hidden="true"></i>
+  <div class="warnpanel__body">
+    <svg class="warnpanel__icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 3.2 1.6 21h20.8L12 3.2z" fill="none" stroke="currentColor" stroke-width="1.7"
+            stroke-linejoin="round"/>
+      <path d="M12 9.6v5.1" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+      <circle cx="12" cy="17.9" r="1.15" fill="currentColor"/>
+    </svg>
+    <div class="warnpanel__txt">
+      <span class="warnpanel__t" id="warnTitle">WARNING</span>
+      <span class="warnpanel__s" id="warnSub">授权口令错误 · 会话已封锁</span>
+    </div>
+    <span class="warnpanel__tick" id="warnTick">2.6s</span>
+  </div>
+</div>
+
+<!-- ░░ 09 开场引导层 ░░ -->
+<div class="boot" id="boot">
+  <div class="boot__inner">
+    <div class="boot__mark">
+      <svg viewBox="0 0 100 100" aria-hidden="true">
+        <circle cx="50" cy="50" r="38" fill="none" stroke="currentColor" stroke-width="6"/>
+        <path d="M50 12v76M12 50h76" stroke="currentColor" stroke-width="6"/>
+        <path d="M50 50 78 22M50 50 22 78" stroke="currentColor" stroke-width="6"/>
+      </svg>
+    </div>
+    <div class="boot__log" id="bootLog"></div>
+    <div class="boot__bar"><i id="bootBar"></i></div>
+    <div class="boot__hint">SCROLL / ↓ 继续</div>
+  </div>
+</div>
+
+<!-- 背景 3D 标志：参数化机械双回环（只负责往 #ribbon 画布上画东西） -->
+<script data-src="js/data.js">
+/* ===== js/data.js ===== */
+(function () {
+/* ============================================================
+ *  个 人 信 息 配 置
+ *  ------------------------------------------------------------
+ *  改这个文件就够了，不用动 css / main.js。
+ *  每一项都有中文注释，照着填即可；不想显示的行删掉整行不会报错。
+ *
+ *  最外层包了一层 IIFE，并显式挂到 window.PROFILE —— 这样拆分版
+ *  （两个 <script src>）和单文件版（内联脚本）行为完全一致，
+ *  也不会和 main.js 里的顶层 const 撞名。
+ * ============================================================ */
+(function (global) {
+'use strict';
+
+const PROFILE = {
+
+  /* ── 终端顶部 / 档案卡抬头 ───────────────────────────────── */
+  terminal: {
+    lab:      'RHINE LAB',        // 左上角机构名
+    subtitle: 'PERSONAL TERMINAL',// 左上角副标题
+    specimen: 'A-01',             // 样本编号
+    opus:     'FLASH',            // 顶部 DEEPSEEK 标签里的值
+    signal:   'STABLE',           // 信号状态
+    sponsor:  'RHINE LAB LLC',    // 档案卡右上角署名
+  },
+
+  /* ── 操作员（= 你自己） ─────────────────────────────────── */
+  operator: {
+    name:    'XvShanzx',          // 档案卡上的大名
+    section: 'LIFE',              // 所属分区代码，会出现在左栏与底部状态栏
+    host:    'LIFE-01',           // 主机编号
+    portraitLabel: 'LOCKED',      // 头像框下方的小标签
+  },
+
+  /* ── 档案卡里的四行属性表（左侧键名 / 右侧值） ───────────── */
+  cardRows: [
+    { k: 'HOST',     v: 'LIFE-01' },
+    { k: 'SECTION',  v: 'LIFE'    },
+    { k: 'ONLINE',   v: '—'       },   // 上线时间由脚本自动写入
+    { k: 'KEYMAP',   v: 'CN'      },
+  ],
+
+  /* ── 右下角授权按钮 / 授权状态机 ─────────────────────────
+   *  key      : 正确的授权口令（不区分大小写）。填错会走参考录屏里那套
+   *             黑橙 WARNING，holdMs 毫秒后自动恢复，左侧事件日志记一笔。
+   *  verifyMs : 验证动画时长（细环转一圈约 850ms）
+   *  holdMs   : WARNING 停留时长，参考录屏字幕写的是 2600ms
+   * ─────────────────────────────────────────────────────── */
+  auth: {
+    placeholder: '输入口令后回车',
+    request:     'REQUEST',
+    pending:     'PENDING',
+    granted:     'GRANTED',
+    key:         'XVSHANZX',
+    verifyMs:    900,
+    holdMs:      2600,
+    hint:        '口令是 XVSHANZX（故意输错，就能看到黑橙封锁态）',
+  },
+
+  /* ── 分幕内容 ───────────────────────────────────────────────
+   *  id      : 锚点 id（会被切成小写连字符）
+   *  code    : 左侧刻度 / 导航上的编号，如 01
+   *  label   : 本幕英文名（大标题上方的等宽小字）
+   *  cn      : 本幕中文名（左侧导航用小字）
+   *  eng     : 本幕英文全称（底部状态栏用）
+   *  title   : 主标题（可拆成两行数组）
+   *  sub     : 主标题下方的一行说明
+   *  shape   : 背景 ∞ 造型形态
+   *            loop 双环 / knot 三叶 / helix 螺旋 / torus 环面 / ring 环形
+   *  lines   : 左栏逐行淡入的参数行（当前幕的详细说明）
+   *  card    : 切换本幕时，右侧档案卡里的四行属性表
+   *  barCn   : 底部状态栏中文
+   *  barEn   : 底部状态栏英文
+   * ───────────────────────────────────────────────────────── */
+  sections: [
+
+    {
+      id: 'profile', code: '01', shape: 'loop',
+      label: 'SECTION 01 · PROFILE', cn: '档案',
+      eng: 'IDENTITY SEALED / PROFILE',
+      title: ['把好奇心', '写成可运行的东西'],
+      sub: 'PERSONAL PROFILE / SUBJECT OVERVIEW',
+      lines: [
+        ['CODENAME', 'XvShanzx'],
+        ['ROLE',     '学生 · 用 AI 把想法跑起来'],
+        ['BASE',     '中国'],
+        ['STATUS',   '学习中 · 暂不接活'],
+      ],
+      barCn: '正在调取身份档案……',
+      barEn: 'RETRIEVING IDENTITY RECORD',
+      card: [
+        { k: 'NAME', v: 'XvShanzx' },
+        { k: 'ROLE', v: 'AI-DRIVEN' },
+        { k: 'BASE', v: 'CN' },
+        { k: 'LANG', v: 'ZH · EN' },
+      ],
+    },
+
+    {
+      id: 'skills', code: '02', shape: 'knot',
+      label: 'SECTION 02 · SKILLS', cn: '技能',
+      eng: 'CAPABILITY MATRIX',
+      title: ['我不写代码', '我负责想清楚要什么'],
+      sub: 'CAPABILITY MATRIX / 我出想法，AI 出实现',
+      lines: [
+        ['FRONTEND', 'HTML · CSS · TypeScript · React'],
+        ['BACKEND',  'Node.js · Python · SQL'],
+        ['MOTION',   'Canvas 2D · SVG · 界面动效'],
+        ['WHO',      '以上都是 AI 会'],
+      ],
+      barCn: '正在展开能力矩阵……',
+      barEn: 'EXPANDING CAPABILITY MATRIX',
+      card: [
+        { k: 'CODE',   v: 'BY AI'   },
+        { k: 'IDEAS',  v: 'BY ME'   },
+        { k: 'MOTION', v: 'CANVAS'  },
+        { k: 'LEVEL',  v: 'LEARNING'},
+      ],
+    },
+
+    {
+      id: 'work', code: '03', shape: 'helix',
+      label: 'SECTION 03 · WORKS', cn: '作品',
+      eng: 'FIELD RECORDS / WORKS',
+      title: ['做过几个', '真能玩起来的东西'],
+      sub: 'FIELD RECORDS / SELECTED WORKS',
+      lines: [
+        ['01', 'FNAF 1-Lite · 网页复刻（已上线 my-game）'],
+        ['02', 'UNO · 霓虹牌桌，浏览器里的四人牌局'],
+        ['03', '恶魔轮盘赌 · Buckshot Roulette 网页版'],
+        ['04', '本页 · RHINE LAB 个人信息终端'],
+      ],
+      barCn: '正在读取作战记录……',
+      barEn: 'READING FIELD RECORDS',
+      card: [
+        { k: 'COUNT',  v: '04'          },
+        { k: 'FOCUS',  v: 'WEB GAME'    },
+        { k: 'STACK',  v: 'AI-ASSISTED' },
+        { k: 'STATE',  v: 'ONGOING'     },
+      ],
+    },
+
+    {
+      id: 'path', code: '04', shape: 'torus',
+      label: 'SECTION 04 · PATH', cn: '经历',
+      eng: 'TIMELINE / CAREER PATH',
+      title: ['一路走来', '弯路也算里程'],
+      sub: 'TIMELINE / CAREER PATH',
+      lines: [
+        ['2026.05', '第一次买 DeepSeek API，开始用 AI 写东西'],
+        ['2026.06', 'FNAF 1-Lite 上线 GitHub Pages'],
+        ['2026.10', '把个人主页做成了你现在看的这个终端'],
+        ['NOW',     '边学边做 · 想到什么就做出来'],
+      ],
+      barCn: '正在回溯时间线……',
+      barEn: 'REWINDING TIMELINE',
+      card: [
+        { k: 'SINCE',  v: '2026.05' },
+        { k: 'FIELD',  v: 'AI-DRIVEN' },
+        { k: 'MODE',   v: 'INDIE' },
+        { k: 'STATUS', v: 'LEARNING' },
+      ],
+    },
+
+    {
+      id: 'contact', code: '05', shape: 'ring',
+      label: 'SECTION 05 · CONTACT', cn: '联系',
+      eng: 'AUTHORIZATION KEY ACCEPTED',
+      title: ['授权通过', '随时可以呼叫'],
+      sub: 'AUTHORIZATION KEY ACCEPTED / CONTACT',
+      lines: [
+        ['GITHUB',   'github.com/XvShanzx'],
+        ['BILIBILI', 'space.bilibili.com/521565610'],
+        ['SITE',     'XvShanzx.github.io'],
+      ],
+      barCn: '授权口令已通过……',
+      barEn: 'AUTHORIZATION KEY ACCEPTED',
+      card: [
+        { k: 'CHANNEL', v: 'GITHUB' },
+        { k: 'REPLY',   v: 'BILI 私信' },
+        { k: 'OPEN',    v: 'YES' },
+        { k: 'KEY',     v: 'OK' },
+      ],
+    },
+
+  ],
+};
+
+/* 暴露给 main.js（也方便你在浏览器控制台里直接看/改：window.PROFILE） */
+global.PROFILE = PROFILE;
+
+})(typeof window !== 'undefined' ? window : globalThis);
+
+})();
+</script>
+<script data-src="js/ribbon.js">
+/* ===== js/ribbon.js ===== */
+(function () {
+/* ============================================================
+ *  背景 3D 标志：肋纹 ∞ 雕塑（参考视频复刻）
+ *  ------------------------------------------------------------
+ *  这是页面上唯一负责背景图形的东西：一个 <canvas id="ribbon">。
+ *  HTML / CSS / 文案 / 卡片 / 交互一概不碰。
+ *
+ *  ── 这一版在复刻参考视频里的那座 ∞ 雕塑 ──
+ *  视频里的 ∞ 不是"发光的丝带"，而是一件**浅色实体雕塑**：
+ *    · 一条有厚度的带面（不是一张纸），转向侧面时能看见厚度边；
+ *    · 带面上密布**横跨带宽的短肋线**（百条量级），这是它最重要的识别特征；
+ *    · 大块近白/浅灰，明暗变化很小，没有彩色发光、没有玻璃反射；
+ *    · 中心交叉处有明确的前后遮挡；
+ *    · 肋线在正对镜头处舒展、在侧向压缩处变密。
+ *
+ *  实现方式（对应上面每一条）：
+ *    · 中心线用参考量算出的参数式 C(t) = (a cos t, b sin 2t, depth sin t)；
+ *    · 逐点算局部标架（切向 T、横向基 N、副法向 B），带宽方向
+ *      D = cos(φ)N + sin(φ)B，φ 绕一圈正好转一整圈 → 闭合处不撕裂；
+ *    · 沿 t 等弧长切 segN 段，沿带宽切 cols 条，截面再给一个厚度 →
+ *      顶面 + 底面 + 两个厚度侧面，全部**共享边界顶点**，是一张连续曲面；
+ *    · 每段中部画一条横肋（跨整个带宽、带轻微鼓起 camber），外加段内再插一条，
+ *      肋的绘制顺序和面片一起按深度排序 → 前后遮挡正确；
+ *    · 面片是**不透明**填充 + 一圈同色细描边（补掉反锯齿缝）。
+ *      不透明是关键：早期版本用逐块半透明，相邻多边形共享边各被反锯齿一次、
+ *      又互不覆盖，于是每段之间出现一条横缝，看起来像一节一节的百叶。
+ *    · 正交投影，保持视频里的技术制图感。
+ *
+ *  对外接口（main.js 依赖，改动需同步）：
+ *     new RhineRibbon(canvas, { shape, onFrame })
+ *     render(dt) / start() / stop() / prepare() / pulse()
+ *     setShape(name, instant, duration)
+ *     rebuildPalette() / paletteKey / hasFrame / pointer / time / travel
+ *     onFrame({ hit })  → 鼠标附近采样点的信息
+ *     cv / sampleN / sliceN / morphDur
+ * ============================================================ */
+(function (global) {
+'use strict';
+
+const TAU = Math.PI * 2;
+const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+const lerp = (a, b, t) => a + (b - a) * t;
+const smooth = (t) => t * t * (3 - 2 * t);
+
+/* ── 参考视频量算出的轮廓参数 ────────────────────────────────
+ *  全部是"相对 a 的比值"，来自对 t=29s 主画面的量算：
+ *  a=357, b=148, depth=81, width=103, camber=6.3（设计像素，1280×720 基准）。
+ *  取 a=1 归一后就是下面这些数。改这里等于改整座雕塑的骨架。
+ * ─────────────────────────────────────────────────────────── */
+const SCULPT = {
+  a: 1.0,
+  b: 0.415,          /* 两瓣纵向幅度 148/357 */
+  depth: 0.227,      /* 交叉处前后间距 81/357 */
+  width: 0.288,      /* 带面宽度 103/357 */
+  camber: 0.0176,    /* 横截面轻微鼓起 6.3/357 */
+  thickness: 0.036,  /* 半厚（世界单位）：满厚 0.072 ≈ 带宽的 25%，转侧时能看见厚度边 */
+  twistPhase: 0.38,  /* 控制哪里展开、哪里侧向压窄（视频参考值） */
+  tiltX: -0.30, tiltY: 0.20, roll: -0.13,   /* 三个静态旋转角 */
+};
+
+/* 带宽沿长度的变化：视频里约 ±14% */
+const widthFactor = (t) => 1 + 0.14 * Math.cos(2 * t + 0.45);
+/* 每段里画几条横肋（肋距 ≈ 2.4px × 3 ÷ …） */
+const RIBS_PER_SEG = 3;
+/* 扭转角：必须正好整圈，否则闭合处会撕裂出接缝 */
+const twistOf = (t, phase) => (phase || 0) + t + 0.32 * Math.sin(2 * t);
+
+/* ── 造型库 ──────────────────────────────────────────────────
+ *  每个造型给出闭合中心线 p(t) 与一个参考向量 v（用来建立局部标架，
+ *  须是 t 的连续函数且不与该处切向平行）。
+ *  loop 就是视频里那座 ∞；其余四个是分幕切换用的变体。
+ * ─────────────────────────────────────────────────────────── */
+const SHAPES = {
+  loop(t) {
+    return {
+      p: [SCULPT.a * Math.cos(t), SCULPT.b * Math.sin(2 * t), SCULPT.depth * Math.sin(t)],
+      v: [0, 0, 1],
+      twistPhase: SCULPT.twistPhase,
+    };
+  },
+  knot(t) {
+    return {
+      p: [0.64 * (Math.sin(t) + 2 * Math.sin(2 * t)),
+          0.64 * (Math.cos(t) - 2 * Math.cos(2 * t)),
+          -0.52 * Math.sin(3 * t)],
+      v: [0, 0, 1],
+      twistPhase: 0.2,
+    };
+  },
+  helix(t) {
+    return {
+      p: [Math.cos(t), 0.62 * Math.sin(2 * t), 0.84 * Math.sin(t)],
+      v: [0.3 * Math.cos(t), -0.4 * Math.cos(2 * t), 1],
+      twistPhase: 0.1,
+    };
+  },
+  torus(t) {
+    const r = 1 + 0.36 * Math.cos(2 * t);
+    return {
+      p: [r * Math.cos(t), 0.60 * Math.sin(2 * t), r * Math.sin(t)],
+      v: [0, 0, 1],
+      twistPhase: 0.5,
+    };
+  },
+  ring(t) {
+    return {
+      p: [Math.cos(t), 0.22 * Math.sin(3 * t), Math.sin(t)],
+      v: [0, 0, 1],
+      twistPhase: 0.9,
+    };
+  },
+};
+
+const shapeKey = (fn) => {
+  for (const k in SHAPES) if (SHAPES[k] === fn) return k;
+  return 'loop';
+};
+
+/* 参考视频的旋转顺序：先绕 X，再绕 Y，最后在屏幕平面内 roll */
+function rotatePoint(x, y, z, o) {
+  let c = Math.cos(o.tiltX), s = Math.sin(o.tiltX);
+  let y1 = c * y - s * z, z1 = s * y + c * z;
+  c = Math.cos(o.tiltY); s = Math.sin(o.tiltY);
+  const x2 = c * x + s * z1, z2 = -s * x + c * z1;
+  c = Math.cos(o.roll); s = Math.sin(o.roll);
+  return [c * x2 - s * y1, s * x2 + c * y1, z2];
+}
+
+class RhineRibbon {
+  constructor(canvas, opts) {
+    opts = opts || {};
+    this.cv = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.pointer = { x: -9999, y: -9999, on: false };
+
+    this.eval = SHAPES[opts.shape] || SHAPES.loop;
+    this.evalOld = this.eval;
+    this.morphT = 1;
+    this.morphDur = 1600;
+    this.travel = 0;
+
+    this.time = 0;
+    this.last = 0;
+    this.raf = 0;
+    this.running = false;
+    this.hasFrame = false;
+
+    this.dpr = 1; this.w = 0; this.h = 0;
+    this.f = 400;                 /* 正交投影：每个世界单位对应多少像素 */
+    this.segN = 200;
+    this.cols = 6;
+    this.sampleN = 200;
+    this.sliceN = 200;
+    this.sliceCount = 0;
+    this.paletteKey = '';
+    this.palette = null;
+    this.emptyFrame = { hit: null };
+    /* 入场"逐条绘出"：revealT 从 0 涨到 1，只有 k < revealT*n 的段会被画出来。
+       默认 1（不启用），由 main.js 在开场结束时调 reveal(ms) 触发。 */
+    this.revealT = 1;
+    this.revealDur = 0;
+    this._jumpMax = 0; this._jumpSum = 0; this._jumpN = 0; this._jumps = 0;
+
+    this.onFrame = opts.onFrame || function () {};
+
+    this._onResize = this._onResize.bind(this);
+    global.addEventListener('resize', this._onResize);
+    global.addEventListener('pointermove', (e) => {
+      this.pointer.x = e.clientX; this.pointer.y = e.clientY; this.pointer.on = true;
+    }, { passive: true });
+    const off = () => { this.pointer.on = false; };
+    document.addEventListener('mouseleave', off);
+    global.addEventListener('blur', off);
+
+    this.rebuildPalette();
+    this._onResize();
+  }
+
+  /* ── 尺寸与构图 ─────────────────────────────────────────────
+   *  目标：桌面端投影占主视觉宽度约 90%、高度约 62%（视频里的 ∞ 是
+   *  宽 795 / 高 412 设计像素，长宽比 1.93）。因为用正交投影，
+   *  f（像素/世界单位）直接等于 目标宽 / 2a，构图是确定的、不会随机跳。
+   * ─────────────────────────────────────────────────────────── */
+  _onResize() {
+    this.dpr = Math.min(global.devicePixelRatio || 1, 1.6);
+    this.w = global.innerWidth;
+    this.h = global.innerHeight;
+    this.cv.width = Math.max(1, Math.round(this.w * this.dpr));
+    this.cv.height = Math.max(1, Math.round(this.h * this.dpr));
+    this.cv.style.width = this.w + 'px';
+    this.cv.style.height = this.h + 'px';
+
+    const wide = this.w >= 900;
+    /* 投影宽度 ≈ 2a·f，取 2a 的可见外接略宽一些留出带宽自身 */
+    const targetW = this.w * (wide ? 0.90 : 0.96);
+    this.f = Math.min(targetW / 2.12, this.h * 1.06);
+    /* 肋的密度：参考视频约每 4~6 像素一条肋 */
+    this.segN = clamp(Math.round(this.f / 2.4), 150, 250);
+    this.sampleN = this.segN;
+    this.sliceN = this.segN;
+    this.cols = wide ? 6 : 5;
+
+    this.buildGeometry();
+    this.render(0.016);
+  }
+
+  /* ── 采样中心线 ─────────────────────────────────────────────
+   *  按**弧长**等分（视频参考也是这么做的）：先细采样求累计长度，
+   *  再按等弧长回查 t，否则曲线疏密不均处肋线会忽密忽疏。
+   * ─────────────────────────────────────────────────────────── */
+  _sample(fn, n, phase) {
+    const ph = phase || 0;
+    const M = 2048;
+    const cx = new Float64Array(M), cy = new Float64Array(M), cz = new Float64Array(M);
+    for (let i = 0; i < M; i++) {
+      const q = fn(i / M * TAU).p;
+      cx[i] = q[0]; cy[i] = q[1]; cz[i] = q[2];
+    }
+    const acc = new Float64Array(M + 1);
+    for (let i = 0; i < M; i++) {
+      const j = (i + 1) % M;
+      acc[i + 1] = acc[i] + Math.hypot(cx[j] - cx[i], cy[j] - cy[i], cz[j] - cz[i]);
+    }
+    const total = acc[M];
+    const at = (s) => {
+      const target = (((s % 1) + 1) % 1) * total;
+      let lo = 0, hi = M;
+      while (lo < hi) { const mid = (lo + hi) >> 1; if (acc[mid] < target) lo = mid + 1; else hi = mid; }
+      const i = Math.max(0, lo - 1);
+      const seg = acc[i + 1] - acc[i] || 1;
+      return (i + (target - acc[i]) / seg) / M * TAU;
+    };
+
+    const pos = new Float64Array(n * 3);
+    const ref = new Float64Array(n * 3);
+    const wid = new Float64Array(n);
+    const twi = new Float64Array(n);
+    let maxX = 1e-6;
+    for (let k = 0; k < n; k++) {
+      const s = k / n;
+      const t = at(s + ph);
+      const q = fn(t);
+      const i3 = k * 3;
+      pos[i3] = q.p[0]; pos[i3 + 1] = q.p[1]; pos[i3 + 2] = q.p[2];
+      const vl = Math.hypot(q.v[0], q.v[1], q.v[2]) || 1;
+      ref[i3] = q.v[0] / vl; ref[i3 + 1] = q.v[1] / vl; ref[i3 + 2] = q.v[2] / vl;
+      wid[k] = widthFactor(t);
+      twi[k] = twistOf(t, q.twistPhase);
+      if (Math.abs(pos[i3]) > maxX) maxX = Math.abs(pos[i3]);
+    }
+    /* 归一：让所有造型的最大 |x| 一致 → 切换造型时投影宽度不变、不会整体缩放跳变 */
+    const k2 = 1 / maxX;
+    for (let i = 0; i < pos.length; i++) pos[i] *= k2;
+    return { n, pos, ref, wid, twi, maxX };
+  }
+
+  /* 逐点标架：切向 T、带宽方向 D（= 绕 T 旋转后的横向基）、面法向 F */
+  _frames(S, out) {
+    const n = S.n, pos = S.pos, ref = S.ref;
+    const tan = out.tan, bw = out.bw;
+    for (let k = 0; k < n; k++) {
+      const kb = (k + 1) % n, i3 = k * 3, j3 = kb * 3;
+      let tx = pos[j3] - pos[i3], ty = pos[j3 + 1] - pos[i3 + 1], tz = pos[j3 + 2] - pos[i3 + 2];
+      let l = Math.hypot(tx, ty, tz) || 1;
+      tx /= l; ty /= l; tz /= l;
+      const ux = ref[i3], uy = ref[i3 + 1], uz = ref[i3 + 2];
+      let bx = ty * uz - tz * uy, by = tz * ux - tx * uz, bz = tx * uy - ty * ux;
+      l = Math.hypot(bx, by, bz);
+      if (l < 1e-5) { bx = 0; by = 1; bz = 0; } else { bx /= l; by /= l; bz /= l; }
+      /* 绕切向转 twi 角（罗德里格斯） */
+      const c = Math.cos(S.twi[k]), s = Math.sin(S.twi[k]), cw = 1 - c;
+      const r00 = c + tx * tx * cw,      r01 = tx * ty * cw - tz * s, r02 = tx * tz * cw + ty * s;
+      const r10 = ty * tx * cw + tz * s, r11 = c + ty * ty * cw,      r12 = ty * tz * cw - tx * s;
+      const r20 = tz * tx * cw - ty * s, r21 = tz * ty * cw + tx * s, r22 = c + tz * tz * cw;
+      tan[i3] = tx; tan[i3 + 1] = ty; tan[i3 + 2] = tz;
+      bw[i3] = r00 * bx + r01 * by + r02 * bz;
+      bw[i3 + 1] = r10 * bx + r11 * by + r12 * bz;
+      bw[i3 + 2] = r20 * bx + r21 * by + r22 * bz;
+      /* 面法向 F = T × D */
+      out.fn[i3] = ty * out.bw[i3 + 2] - tz * out.bw[i3 + 1];
+      out.fn[i3 + 1] = tz * out.bw[i3] - tx * out.bw[i3 + 2];
+      out.fn[i3 + 2] = tx * out.bw[i3 + 1] - ty * out.bw[i3];
+    }
+  }
+
+  /* ── 构建 ─────────────────────────────────────────────────── */
+  buildGeometry(keepCurrent) {
+    if (!keepCurrent && this.pos) this.snapshot();
+    this.A = this._sample(this.evalOld, this.segN, 0);
+    this.B = this._sample(this.eval, this.segN, this._alignOffset0());
+    const len = this.B.pos.length;
+    if (!this.pos || this.pos.length !== len) {
+      this.pos = new Float64Array(len);
+      this.fromPos = new Float64Array(len);
+      this.ref = new Float64Array(len);
+      this.fromRef = new Float64Array(len);
+      this.wid = new Float64Array(this.B.n);
+      this.fromWid = new Float64Array(this.B.n);
+      this.twi = new Float64Array(this.B.n);
+      this.fromTwi = new Float64Array(this.B.n);
+      this.morphP = new Float64Array(this.B.n);
+      this.fromP = new Float64Array(this.B.n);
+      this._fr = { tan: new Float64Array(len), bw: new Float64Array(len), fn: new Float64Array(len) };
+      const vN = this.B.n * (this.cols + 1);
+      this.px = new Float64Array(vN); this.py = new Float64Array(vN); this.pz = new Float64Array(vN);
+      this.ptx = new Float64Array(vN); this.pty = new Float64Array(vN);
+    }
+    this.ref.set(this.B.ref);
+    this.wid.set(this.B.wid);
+    this.twi.set(this.B.twi);
+    this.morphP.fill(1);
+    this.pos.set(this.B.pos);
+    this._buildVerts();
+  }
+
+  /* 由中心线 + 标架生成截面顶点（顶面 cols+1 条，另有底面与两侧共 4 个角点） */
+  _buildVerts() {
+    const n = this.segN, cols = this.cols;
+    const S = { n, pos: this.pos, ref: this.ref, wid: this.wid, twi: this.twi };
+    const fr = this._fr;
+    this._frames(S, fr);
+    const bw = fr.bw, fn = fr.fn, pos = this.pos;
+    const vN = n * (cols + 1);
+    if (!this.tx || this.tx.length !== vN) {
+      this.tx = new Float64Array(vN); this.ty = new Float64Array(vN); this.tz = new Float64Array(vN);
+      this.bx = new Float64Array(vN); this.by = new Float64Array(vN); this.bz = new Float64Array(vN);
+      this.nx = new Float64Array(vN); this.ny = new Float64Array(vN); this.nz = new Float64Array(vN);
+      this.u = new Float64Array(vN);
+    }
+    const tx = this.tx, ty = this.ty, tz = this.tz;
+    const bx = this.bx, by = this.by, bz = this.bz;
+    const nx = this.nx, ny = this.ny, nz = this.nz, uu = this.u;
+    for (let k = 0; k < n; k++) {
+      const i3 = k * 3;
+      const hw = 0.5 * SCULPT.width * this.wid[k];
+      const ht = SCULPT.thickness * this.wid[k];
+      for (let c = 0; c <= cols; c++) {
+        const u = (c / cols) * 2 - 1;
+        const o = k * (cols + 1) + c;
+        const camber = SCULPT.camber * (1 - u * u);
+        uu[o] = u;
+        /* 顶面：+ht 并加一点鼓起 */
+        const offTop = ht + camber;
+        tx[o] = pos[i3] + bw[i3] * hw * u + fn[i3] * offTop;
+        ty[o] = pos[i3 + 1] + bw[i3 + 1] * hw * u + fn[i3 + 1] * offTop;
+        tz[o] = pos[i3 + 2] + bw[i3 + 2] * hw * u + fn[i3 + 2] * offTop;
+        /* 底面：-ht 再反向鼓起 */
+        const offBot = -ht - camber;
+        bx[o] = pos[i3] + bw[i3] * hw * u + fn[i3] * offBot;
+        by[o] = pos[i3 + 1] + bw[i3 + 1] * hw * u + fn[i3 + 1] * offBot;
+        bz[o] = pos[i3 + 2] + bw[i3 + 2] * hw * u + fn[i3 + 2] * offBot;
+        nx[o] = fn[i3]; ny[o] = fn[i3 + 1]; nz[o] = fn[i3 + 2];
+      }
+    }
+  }
+
+  /* 造型切换时的相位对齐：找一个旋转偏移，让新造型尽量"接着"当前画面 */
+  _alignOffset0() {
+    if (!this.pos || !this.fromPos) return 0;
+    const n = this.segN;
+    const probe = this._sample(this.eval, n, 0);
+    const L = this.fromPos;
+    let best = 0, bestCost = Infinity;
+    for (let s = 0; s < n; s += 4) {
+      let cost = 0;
+      for (let k = 0; k < n; k += 3) {
+        const o = k * 3, p = ((k + s) % n) * 3;
+        cost += (L[o] - probe.pos[p]) * (L[o] - probe.pos[p]) +
+                (L[o + 1] - probe.pos[p + 1]) * (L[o + 1] - probe.pos[p + 1]) +
+                (L[o + 2] - probe.pos[p + 2]) * (L[o + 2] - probe.pos[p + 2]);
+      }
+      if (cost < bestCost) { bestCost = cost; best = s; }
+    }
+    return best / n;
+  }
+
+  /* ── 形态切换：快照式，无论切多快都从"当前画面"接着走 ──────── */
+  setShape(name, instant, duration) {
+    const fn = SHAPES[name] || SHAPES.loop;
+    if (fn === this.eval) return;
+    this.snapshot();
+    this.evalOld = this.eval;
+    this.eval = fn;
+    this.buildGeometry(true);       /* 只换目标，画面仍按在快照上 */
+    this.morphDur = duration || 1600;
+    this.morphT = instant ? 1 : 0;
+    this._measureTravel();
+    this._applyFrom();
+    if (global.__RHINE_JUMP_LOG__) {
+      console.log('[RHINE-SHAPE] ' + shapeKey(this.evalOld) + ' → ' + shapeKey(this.eval) +
+        '  行程 ' + (this.travel || 0).toFixed(3) + '  分段 ' + this.segN + '×' + (this.cols + 1) +
+        '  时长 ' + Math.round(this.morphDur) + 'ms');
+    }
+  }
+
+  snapshot() {
+    if (!this.pos) return;
+    this.fromPos.set(this.pos);
+    this.fromRef.set(this.ref);
+    this.fromWid.set(this.wid);
+    this.fromTwi.set(this.twi);
+    this.fromP.set(this.morphP);
+  }
+
+  _applyFrom() {
+    if (!this.fromPos || this.fromPos.length !== this.pos.length) return;
+    this.pos.set(this.fromPos);
+    this.ref.set(this.fromRef);
+    this.wid.set(this.fromWid);
+    this.twi.set(this.fromTwi);
+    this.morphP.set(this.fromP);
+    this._buildVerts();
+  }
+
+  _measureTravel() {
+    const P = this.B.pos, F = this.fromPos;
+    if (!F || F.length !== P.length) { this.travel = 0; return; }
+    let sum = 0;
+    for (let i = 0; i < P.length; i += 3) {
+      sum += Math.hypot(F[i] - P[i], F[i + 1] - P[i + 1], F[i + 2] - P[i + 2]);
+    }
+    this.travel = sum / (P.length / 3);
+  }
+
+  _morph(dt) {
+    this.morphT = clamp(this.morphT + dt * (1000 / this.morphDur), 0, 1);
+    const m = smooth(this.morphT), B = this.B;
+    if (!this.fromPos || this.fromPos.length !== B.pos.length) {
+      this.pos.set(B.pos); this.ref.set(B.ref); this.wid.set(B.wid); this.twi.set(B.twi);
+      this._buildVerts();
+      return;
+    }
+    const k0 = 1 - m;
+    for (let i = 0; i < B.pos.length; i++) {
+      this.pos[i] = this.fromPos[i] * k0 + B.pos[i] * m;
+      this.ref[i] = this.fromRef[i] * k0 + B.ref[i] * m;
+    }
+    for (let k = 0; k < B.n; k++) {
+      this.wid[k] = this.fromWid[k] * k0 + B.wid[k] * m;
+      this.twi[k] = this.fromTwi[k] * k0 + B.twi[k] * m;
+      this.morphP[k] = lerp(this.fromP[k], 1, m);
+    }
+    this._buildVerts();
+  }
+
+  /* ── 配色 ───────────────────────────────────────────────────
+   *  视频里的 ∞ 是**浅色实体雕塑**：面片接近白（218~240 灰阶），
+   *  肋线是中灰（140~178）。所以底色必须比它略深一点，雕塑才能"亮"出来。
+   * ─────────────────────────────────────────────────────────── */
+  rebuildPalette() {
+    const cs = global.getComputedStyle(document.documentElement);
+    const dark = (cs.getPropertyValue('--rib-lo') || '108').trim().split(',')[0] < 90;
+    this.paletteKey = dark ? 'dark' : 'light';
+    /* 对着参考帧量出来的灰阶定标：亮面 227~237、背光面 205~225、肋线 ≈160 */
+    const next = dark
+      ? { top: 58, topAmp: 26, side: 44, sideAmp: 20, bot: 34, botAmp: 16,
+          rib: 104, ribAmp: 22, ribAlpha: 0.34, seam: 0.4, tint: [-2, 0, 5] }
+      : { top: 218, topAmp: 22, side: 205, sideAmp: 22, bot: 196, botAmp: 18,
+          rib: 132, ribAmp: 20, ribAlpha: 0.72, seam: 0.45, tint: [2, 1, -3] };
+    /* 主题切换时不要硬切：记下旧值，在 render 里缓动过去（约 0.45s） */
+    if (!this.palette) {
+      this.palette = next;
+    } else {
+      const from = {};
+      for (const k in next) from[k] = Array.isArray(next[k]) ? next[k].slice() : this.palette[k];
+      this._palFrom = from;
+      this._palTo = next;
+      this._palT = 0;
+    }
+  }
+
+  /* 把调色板从旧主题缓动到新主题 */
+  _tickPalette(dt) {
+    if (!this._palTo) return;
+    this._palT = clamp(this._palT + (dt > 0 ? dt : 0.016) / 0.45, 0, 1);
+    const k = smooth(this._palT), a = this._palFrom, b = this._palTo, cur = this.palette;
+    for (const key in b) {
+      if (Array.isArray(b[key])) {
+        for (let i = 0; i < b[key].length; i++) cur[key][i] = lerp(a[key][i], b[key][i], k);
+      } else {
+        cur[key] = lerp(a[key], b[key], k);
+      }
+    }
+    if (this._palT >= 1) {
+      for (const key in b) {
+        if (Array.isArray(b[key])) cur[key] = b[key].slice(); else cur[key] = b[key];
+      }
+      this._palTo = null;
+    }
+  }
+
+  pulse() { this.boost = 1; }
+  prepare() { this.hasFrame = false; this.render(0.016); }
+
+  /* 入场：沿环路把带面与横肋逐条"画"出来（对照参考录屏"∞ 以笔触绘出"）。
+     进度按**墙上时间**算，而不是累加每帧 dt —— 掉帧或后台节流时不会越画越慢。 */
+  reveal(ms) {
+    this.revealDur = Math.max(120, ms || 1300);
+    this._revealStart = global.performance.now();
+    this.revealT = 0;
+  }
+
+  _tickReveal() {
+    if (this.revealT >= 1 || !this._revealStart) return;
+    this.revealT = clamp((global.performance.now() - this._revealStart) / this.revealDur, 0, 1);
+  }
+
+  start() {
+    if (this.running) return;
+    this.running = true;
+    this.last = global.performance.now();
+    const tick = (now) => {
+      if (!this.running) return;
+      let dt = (now - this.last) / 1000;
+      this.last = now;
+      if (dt > 0.1) dt = 0.1;
+      this.time += dt;
+      if (this.boost > 0) this.boost = Math.max(0, this.boost - dt * 1.5);
+      this._tickReveal();
+      if (this.morphT < 1) this._morph(dt);
+      this.render(dt);
+      this.raf = global.requestAnimationFrame(tick);
+    };
+    this.raf = global.requestAnimationFrame(tick);
+  }
+  stop() { this.running = false; global.cancelAnimationFrame(this.raf); }
+
+  /* ── 渲染 ──────────────────────────────────────────────────
+   *  1) 把每个面片和每条肋都算成一个带深度的"图元"
+   *  2) 全部按深度从远到近排序（画家算法）
+   *  3) 依次不透明填充：面片带一圈同色细描边补掉反锯齿缝
+   *  这就是视频里的画面组织方式，前后遮挡自然正确。
+   * ─────────────────────────────────────────────────────────── */
+  render(dt) {
+    const tStart = global.performance.now();
+    const ctx = this.ctx, w = this.w, h = this.h;
+    const cs = global.getComputedStyle(document.documentElement);
+    const P = this.palette || (this.rebuildPalette(), this.palette);
+    this._tickPalette(dt);
+
+    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    /* 只清空、不铺底色：纸底交给 body 的 CSS 背景（它自带 480ms 过渡），
+       这样明暗主题切换时纸底是渐渐变过去的，而不是硬切成一帧。 */
+    ctx.clearRect(0, 0, w, h);
+
+    if (!this.pos) this.buildGeometry(true);
+    const n = this.segN, cols = this.cols;
+    const CX = w * 0.5, CY = h * 0.5;
+    const f = this.f;
+
+    /* 极慢的自转与轻微摆动：视频里的 idle 基本是静止的，只有很轻的漂移 */
+    const t0 = this.time;
+    const px = this.pointer.on ? (this.pointer.x / w - 0.5) : 0;
+    const py = this.pointer.on ? (this.pointer.y / h - 0.5) : 0;
+    const rot = {
+      tiltX: SCULPT.tiltX + Math.sin(t0 * 0.055 + 0.7) * 0.030 + py * 0.05,
+      tiltY: SCULPT.tiltY + Math.sin(t0 * 0.041) * 0.115 + px * 0.05,
+      roll: SCULPT.roll + Math.sin(t0 * 0.023 + 1.9) * 0.022,
+    };
+
+    /* 顶点投影（正交）：屏幕 = 中心 + (rx·f, -ry·f)，深度取 rz（越大越靠前） */
+    const vN = n * (cols + 1);
+    if (!this.sx || this.sx.length !== vN) {
+      this.sx = new Float64Array(vN); this.sy = new Float64Array(vN);
+      this.sbx = new Float64Array(vN); this.sby = new Float64Array(vN);
+      this.sz = new Float64Array(vN); this.sbz = new Float64Array(vN);
+      this.snx = new Float64Array(vN); this.sny = new Float64Array(vN);
+      this.snz = new Float64Array(vN);
+    }
+    const sx = this.sx, sy = this.sy, sbx = this.sbx, sby = this.sby;
+    const sz = this.sz, sbz = this.sbz, snx = this.snx, sny = this.sny, snz = this.snz;
+    this.spineX = this.spineX && this.spineX.length === n ? this.spineX : new Float64Array(n);
+    this.spineY = this.spineY && this.spineY.length === n ? this.spineY : new Float64Array(n);
+    const spX = this.spineX, spY = this.spineY;
+
+    for (let k = 0; k < n; k++) {
+      for (let c = 0; c <= cols; c++) {
+        const o = k * (cols + 1) + c;
+        let r = rotatePoint(this.tx[o], this.ty[o], this.tz[o], rot);
+        sx[o] = CX + r[0] * f; sy[o] = CY - r[1] * f; sz[o] = r[2];
+        r = rotatePoint(this.bx[o], this.by[o], this.bz[o], rot);
+        sbx[o] = CX + r[0] * f; sby[o] = CY - r[1] * f; sbz[o] = r[2];
+        /* 面法向同样要转到相机空间才能打光 */
+        r = rotatePoint(this.nx[o], this.ny[o], this.nz[o], rot);
+        snx[o] = r[0]; sny[o] = r[1]; snz[o] = r[2];
+      }
+      const mid = k * (cols + 1) + (cols >> 1);
+      spX[k] = sx[mid]; spY[k] = sy[mid];
+    }
+
+    /* 光源与参考一致：偏向画面左上、略偏观察者 */
+    const LX = -0.30, LY = -0.62, LZ = 0.72;
+
+    /* 1) 收集图元：顶面 cols 条 + 底面 1 块 + 两个厚度侧面 + 每段 2 条横肋 */
+    const prims = this._prims || (this._prims = []);
+    prims.length = 0;
+    const seg = this.morphP;
+    const put = (kind, k, z, ax, ay, bx, by, cx, cy, dx, dy, val) => {
+      prims.push({ kind: kind, k: k, z: z, val: val,
+        ax: ax, ay: ay, bx: bx, by: by, cx: cx, cy: cy, dx: dx, dy: dy });
+    };
+
+    for (let k = 0; k < n; k++) {
+      const kb = (k + 1) % n;
+      const g0 = k * (cols + 1), g1 = kb * (cols + 1);
+      const fade = seg[k] || 1;
+      /* 顶面 */
+      for (let c = 0; c < cols; c++) {
+        const a0 = g0 + c, a1 = g0 + c + 1, b0 = g1 + c, b1 = g1 + c + 1;
+        const z = (sz[a0] + sz[a1] + sz[b0] + sz[b1]) * 0.25;
+        const nxc = (snx[a0] + snx[a1] + snx[b0] + snx[b1]) * 0.25;
+        const nyc = (sny[a0] + sny[a1] + sny[b0] + sny[b1]) * 0.25;
+        const nzc = (snz[a0] + snz[a1] + snz[b0] + snz[b1]) * 0.25;
+        const nl = Math.hypot(nxc, nyc, nzc) || 1;
+        const lit = 0.45 + 0.55 * Math.abs((nxc * LX + nyc * LY + nzc * LZ) / nl);
+        put(0, k, z, sx[a0], sy[a0], sx[a1], sy[a1], sx[b1], sy[b1], sx[b0], sy[b0],
+            P.top + P.topAmp * lit);
+      }
+      /* 底面：整段一块（基本被挡住，省开销） */
+      {
+        const a0 = g0, a1 = g0 + cols, b0 = g1, b1 = g1 + cols;
+        const z = (sbz[a0] + sbz[a1] + sbz[b0] + sbz[b1]) * 0.25;
+        put(0, k, z, sbx[a0], sby[a0], sbx[a1], sby[a1], sbx[b1], sby[b1], sbx[b0], sby[b0],
+            P.bot + P.botAmp * 0.7);
+      }
+      /* 两个厚度侧面：带子转向正对镜头时，这两片就是"厚度"的可见证据 */
+      for (let s = 0; s < 2; s++) {
+        const cc = s === 0 ? 0 : cols;
+        const a = g0 + cc, b = g1 + cc;
+        const z = (sz[a] + sz[b] + sbz[a] + sbz[b]) * 0.25;
+        const lit = 0.35 + 0.65 * clamp(1 - Math.abs(snz[a]), 0, 1);
+        put(0, k, z + 0.0015, sx[a], sy[a], sx[b], sy[b], sbx[b], sby[b], sbx[a], sby[a],
+            P.side + P.sideAmp * lit);
+      }
+      /* 横肋：每条横跨整个带宽。视频里肋距约 3 像素，所以一段里插三条；
+         两端各向内收一点，避免线头戳出雕塑轮廓（侧向压缩处会形成一圈"睫毛"）。 */
+      for (let r = 0; r < RIBS_PER_SEG; r++) {
+        const mix = (r + 0.5) / RIBS_PER_SEG;
+        const pts = [];
+        let zsum = 0;
+        for (let c = 0; c <= cols; c++) {
+          const a0 = g0 + c, b0 = g1 + c;
+          pts.push(sx[a0] + (sx[b0] - sx[a0]) * mix,
+                   sy[a0] + (sy[b0] - sy[a0]) * mix);
+          zsum += sz[a0] + (sz[b0] - sz[a0]) * mix;
+        }
+        /* 端点内收 16% 个列宽 */
+        for (let e = 0; e < 2; e++) {
+          const i0 = e === 0 ? 0 : pts.length - 2;
+          const i1 = e === 0 ? 2 : pts.length - 4;
+          pts[i0] = pts[i0] + (pts[i1] - pts[i0]) * 0.16;
+          pts[i0 + 1] = pts[i0 + 1] + (pts[i1 + 1] - pts[i0 + 1]) * 0.16;
+        }
+        const tm = (k + mix) / n * TAU;
+        prims.push({ kind: 1, k: k, z: zsum / (cols + 1) + 0.004,
+          val: P.rib + P.ribAmp * (0.5 + 0.5 * Math.sin(tm + 0.5)),
+          pts: pts, fade: fade, ax: 0, ay: 0, bx: 0, by: 0, cx: 0, cy: 0, dx: 0, dy: 0 });
+      }
+    }
+
+    prims.sort((a, b) => a.z - b.z || a.k - b.k);
+
+    /* 画：面片不透明填充 + 同色 0.35px 描边（补掉相邻面片之间的反锯齿缝） */
+    const tint = P.tint;
+    /* 入场绘制：还没轮到的那一段直接不画 */
+    const revLim = this.revealT < 1 ? this.revealT * n : Infinity;
+    for (let i = 0; i < prims.length; i++) {
+      const p = prims[i];
+      if (p.k >= revLim) continue;
+      if (p.kind === 0) {
+        const v = p.val < 0 ? 0 : p.val > 255 ? 255 : p.val;
+        const col = 'rgb(' + ((v + tint[0]) | 0) + ',' + ((v + tint[1]) | 0) + ',' + ((v + tint[2]) | 0) + ')';
+        ctx.beginPath();
+        ctx.moveTo(p.ax, p.ay);
+        ctx.lineTo(p.bx, p.by);
+        ctx.lineTo(p.cx, p.cy);
+        ctx.lineTo(p.dx, p.dy);
+        ctx.closePath();
+        ctx.fillStyle = col;
+        ctx.fill();
+        ctx.strokeStyle = col;
+        ctx.lineWidth = P.seam;
+        ctx.stroke();
+      } else {
+        const v = p.val < 0 ? 0 : p.val > 255 ? 255 : p.val;
+        ctx.globalAlpha = P.ribAlpha * (0.55 + 0.45 * (p.fade || 1));
+        ctx.strokeStyle = 'rgb(' + ((v + tint[0]) | 0) + ',' + ((v + tint[1]) | 0) + ',' + ((v + tint[2]) | 0) + ')';
+        ctx.lineWidth = 1.05;
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        ctx.moveTo(p.pts[0], p.pts[1]);
+        for (let j = 2; j < p.pts.length; j += 2) ctx.lineTo(p.pts[j], p.pts[j + 1]);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+    }
+    this.sliceCount = prims.length;
+
+    /* 悬停：最近采样点上的一个小标记 */
+    let hit = null, hitD = 1e9;
+    if (this.pointer.on) {
+      for (let k = 0; k < n; k++) {
+        const dx = spX[k] - this.pointer.x, dy = spY[k] - this.pointer.y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < hitD) { hitD = d2; hit = { x: spX[k], y: spY[k], k: k, depth: 0.5 }; }
+      }
+    }
+    if (hit && hitD < 150 * 150) {
+      ctx.fillStyle = cs.getPropertyValue('--accent').trim() || '#e08a2e';
+      ctx.beginPath();
+      ctx.arc(hit.x, hit.y, 2.0, 0, TAU);
+      ctx.fill();
+      this.onFrame({ hit: hit });
+    } else {
+      this.onFrame(this.emptyFrame);
+    }
+
+    this.hasFrame = true;
+    this._continuity(dt);
+
+    const ms = global.performance.now() - tStart;
+    this._msSum = (this._msSum || 0) + ms;
+    this._msN = (this._msN || 0) + 1;
+    if (ms > (this._msMax || 0)) this._msMax = ms;
+    if (this._msN === 30 && (global.__RHINE_JUMP_LOG__ || /[?&]perf=1/.test(location.search))) {
+      let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+      for (let i = 0; i < vN; i++) {
+        const X = sx[i], Y = sy[i];
+        if (X < x0) x0 = X; if (X > x1) x1 = X;
+        if (Y < y0) y0 = Y; if (Y > y1) y1 = Y;
+      }
+      console.log('[RHINE-PERF] 帧 ' + this._msN + ' 次 平均 ' + (this._msSum / this._msN).toFixed(1) +
+        'ms 最大 ' + this._msMax.toFixed(1) + 'ms  图元 ' + this.sliceCount +
+        '  投影占屏 宽 ' + ((x1 - x0) / this.w * 100).toFixed(0) + '%' +
+        ' 高 ' + ((y1 - y0) / this.h * 100).toFixed(0) + '%' +
+        '  带宽 ' + Math.round(SCULPT.width * this.f * 0.5 * 2) + 'px  分段 ' + this.segN + '×' + (this.cols + 1));
+    }
+  }
+
+  /* 连续性自检：相邻两帧逐顶点位移与理论上限比，超限说明是瞬移不是运动 */
+  _continuity(dt) {
+    if (this._jumpN >= 100000) return;
+    const pos = this.pos;
+    if (this._prevPos && this._prevPos.length === pos.length) {
+      let dmax = 0;
+      for (let i = 0; i < pos.length; i += 3) {
+        const dx = pos[i] - this._prevPos[i];
+        const dy = pos[i + 1] - this._prevPos[i + 1];
+        const dz = pos[i + 2] - this._prevPos[i + 2];
+        const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (d > dmax) dmax = d;
+      }
+      const dts = (typeof dt === 'number' && dt > 0) ? dt : 0.016;
+      const expect = (this.travel || 0) * (dts / (this.morphDur / 1000)) * 1.8 + 0.004;
+      if (dmax > this._jumpMax) this._jumpMax = dmax;
+      this._jumpSum += dmax; this._jumpN++;
+      if (dmax > expect) {
+        this._jumps++;
+        if (global.__RHINE_JUMP_LOG__ && this._jumps < 8) {
+          console.log('[RHINE-JUMP] 异常位移 ' + dmax.toFixed(4) + ' > 上限 ' + expect.toFixed(4) +
+            '  [dt=' + dts.toFixed(3) + 's 行程=' + (this.travel || 0).toFixed(3) +
+            ' morphT=' + this.morphT.toFixed(2) + ']');
+        }
+      }
+    } else {
+      this._prevPos = new Float64Array(pos.length);
+    }
+    this._prevPos.set(pos);
+  }
+}
+
+/* ============================================================ */
+
+global.RhineRibbon = RhineRibbon;
+global.Ribbon = RhineRibbon;   /* 旧名字保留，兼容 main.js 与探针 */
+
+})(typeof window !== 'undefined' ? window : globalThis);
+
+})();
+</script>
+<script data-src="js/main.js">
+/* ===== js/main.js ===== */
+(function () {
+/* ============================================================
+ *  RHINE LAB · 个人终端主脚本
+ *  ── 目录 ─────────────────────────────────────────────────
+ *  00  工具函数
+ *  01  造型库（薄片丝带要走的那些三维曲线）
+ *  02  丝带引擎 Ribbon（切片 / 投影 / 绘制 / 鼠标高亮）
+ *  03  开场引导层
+ *  04  HUD：时钟 / 主题 / 动效开关
+ *  05  分幕：渲染 / 滚动联动 / 打字机
+ *  06  档案卡
+ *  07  应用装配
+ * ============================================================ */
+(function () {
+  'use strict';
+
+  /* ── 00 工具 ────────────────────────────────────────────── */
+  /* PROFILE 由 js/data.js 挂在 window 上（拆分版/单文件版都一样） */
+  const CFG = (typeof window !== 'undefined' && window.PROFILE) || {};
+  const $  = (s, r) => (r || document).querySelector(s);
+  const $$ = (s, r) => Array.prototype.slice.call((r || document).querySelectorAll(s));
+  const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+  const lerp  = (a, b, t) => a + (b - a) * t;
+  const smooth = (t) => t * t * (3 - 2 * t);
+  const TAU = Math.PI * 2;
+  const esc = (s) => String(s).replace(/[&<>"]/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  /* ── 01 造型名 ──────────────────────────────────────────────
+   *  曲线本身（双回环 / 三叶 / 螺旋 / 环面结 / 单环）已经搬进 js/ribbon.js，
+   *  这里只留一份"名字 → 造型"的对应关系，分幕切场景时按名字调用。
+   *  造型名写在 js/data.js 每一幕的 shape 字段里，改那儿就能换背景形态。
+   * ─────────────────────────────────────────────────────────── */
+  const SHAPE_NAMES = ['loop', 'knot', 'helix', 'torus', 'ring'];
+
+  /* ── 02 背景 3D 标志 ─────────────────────────────────────
+   *  背景那条"参数化机械双回环"已经独立成文件：js/ribbon.js
+   *  它只负责往 #ribbon 这个 canvas 上画东西，对外暴露 RhineRibbon
+   *  （同时保留旧名 Ribbon），接口与本文件下面用到的完全一致：
+   *    render / start / stop / prepare / pulse / setShape
+   *    rebuildPalette / paletteKey / hasFrame / pointer / time / travel
+   *  想调结构（肋骨数量、大小、转速、明暗、颜色）都在那个文件里，
+   *  本文件（页面布局 / 分幕 / 卡片 / 交互）不需要跟着改。
+   * ───────────────────────────────────────────────────────── */
+
+  /* ── 03 开场引导层 ─────────────────────────────────────── */
+  const BOOT_LINES = [
+    ['RHINE LAB TERMINAL · DEEPSEEK FLASH', ''],
+    ['> MOUNTING SECTION /LIFE-01', 'ok'],
+    ['> LOADING SPECIMEN RECORD', 'ok'],
+    ['> CALIBRATING RIBBON MESH', 'ok'],
+    ['> CROSS-CHECKING AUTHORIZATION KEY', 'wait'],
+  ];
+
+  function runBoot(onDone) {    const logEl = $('#bootLog'), barEl = $('#bootBar');
+    const hintEl = $('.boot__hint'), bootEl = $('#boot');
+    if (!bootEl) { onDone(); return; }
+    const lines = [];
+    const push = (html) => {
+      lines.push('<div>' + html + '</div>');
+      logEl.innerHTML = lines.join('');
+    };
+    let i = 0, progress = 0;
+
+    const step = () => {
+      if (i >= BOOT_LINES.length) {
+        barEl.style.width = '100%';
+        push('<b>CROSS-CHECK</b> <span class="ok">GRANTED</span> · 正在进入终端');
+        setTimeout(() => {
+          hintEl.classList.add('is-on');
+          bootEl.classList.add('is-done');
+          onDone();
+          setTimeout(() => { bootEl.style.display = 'none'; }, 900);
+        }, 560);
+        return;
+      }
+      const [text, tag] = BOOT_LINES[i];
+      const tail = tag === 'ok' ? ' <span class="ok">[ OK ]</span>'
+                 : tag === 'wait' ? ' <span class="ok">[...]</span>' : '';
+      push(esc(text) + tail);
+      i++;
+      progress = Math.round((i / (BOOT_LINES.length + 1)) * 92);
+      barEl.style.width = progress + '%';
+      setTimeout(step, text.length > 30 ? 320 : 230);
+    };
+    setTimeout(step, 300);
+  }
+
+  /* ── 04 HUD ────────────────────────────────────────────── */
+  const WEEK = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+  const MONTH = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+  const pad2 = (n) => (n < 10 ? '0' + n : '' + n);
+
+  function initClock() {
+    const tEl = $('#clockTime'), wEl = $('#clockWeek'), dEl = $('#clockDate'), ticks = $('#clockTicks');
+    if (!tEl) return;
+    ticks.innerHTML = new Array(7).fill('<i></i>').join('');
+    const tickEls = $$('i', ticks);
+    const tick = () => {
+      const n = new Date();
+      tEl.textContent = pad2(n.getHours()) + ':' + pad2(n.getMinutes());
+      wEl.textContent = WEEK[n.getDay()] + ' / PERS';
+      dEl.textContent = pad2(n.getDate()) + ' ' + MONTH[n.getMonth()] + ' ' + n.getFullYear();
+      tickEls.forEach((el, i) => {
+        el.className = i === n.getDay() ? 'is-today' : (i < n.getDay() ? 'is-past' : '');
+      });
+    };
+    tick();
+    setInterval(tick, 15000);
+  }
+
+  function initUptime() {
+    const el = $('#metaUptime');
+    if (!el) return;
+    const t0 = Date.now();
+    setInterval(() => {
+      const s = Math.floor((Date.now() - t0) / 1000);
+      el.textContent = pad2(Math.floor(s / 3600)) + ':' + pad2(Math.floor(s / 60) % 60) + ':' + pad2(s % 60);
+    }, 1000);
+  }
+
+  function initTheme(ribbon) {
+    const root = document.documentElement;
+    const btn = $('#themeBtn');
+    let theme = 'light';
+    try { theme = localStorage.getItem('rhine-theme') || 'light'; } catch (e) {}
+    /* 也支持 URL 直接指定：?theme=dark（方便分享某个主题的链接） */
+    const fromUrl = /[?&]theme=(dark|light)/.exec(location.search);
+    if (fromUrl) theme = fromUrl[1];
+    root.setAttribute('data-theme', theme === 'dark' ? 'dark' : 'light');
+
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const canVT = typeof document.startViewTransition === 'function';
+
+    /* 换主题真正要做的事：改根属性、记住选择、让 canvas 立刻按新主题重画一次。
+       ribbon.rebuildPalette() 内部会把旧调色板记下来，接下来 0.45s 缓动过去。 */
+    const commit = (next) => {
+      root.setAttribute('data-theme', next);
+      try { localStorage.setItem('rhine-theme', next); } catch (e) {}
+      ribbon.paletteKey = '';
+      ribbon.rebuildPalette();
+      ribbon.render(0.016);
+    };
+
+    btn.addEventListener('click', () => {
+      const next = root.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+      const still = reduce || root.classList.contains('no-anim');
+      if (still) { commit(next); return; }
+      if (canVT) {
+        /* Chromium：整页交叉淡入淡出，屏幕上的 ∞ 雕塑也一起过渡 */
+        document.startViewTransition(() => commit(next));
+      } else {
+        /* 其它浏览器：纸底走 body 自带的过渡，其余主题色临时挂 460ms 过渡兜底 */
+        commit(next);
+        root.classList.add('theme-tween');
+        window.setTimeout(() => root.classList.remove('theme-tween'), 620);
+      }
+    });
+
+    /* 调试用：?themetest=1 或 ?themetest=2600 会在指定毫秒后自动点一次主题按钮，
+       方便把截图卡在过渡中间那一帧。默认 2600ms（开场动画约 2s 后才结束）。 */
+    const tt = /[?&]themetest=(\d+)/.exec(location.search);
+    if (tt) {
+      const delay = Math.max(200, parseInt(tt[1], 10) || 2600);
+      /* 顺便把过渡中途的值打出来，好确认真的在"渐变"而不是硬切 */
+      const probe = (label, ms) => window.setTimeout(() => {
+        const p = ribbon.palette || {};
+        console.log('[RHINE-THEME] ' + label + '  theme=' + root.getAttribute('data-theme') +
+          '  纸底=' + window.getComputedStyle(document.body).backgroundColor +
+          '  ∞亮面=' + (typeof p.top === 'number' ? p.top.toFixed(1) : '?') +
+          '  肋=' + (typeof p.rib === 'number' ? p.rib.toFixed(1) : '?'));
+      }, delay + ms);
+      window.setTimeout(() => {
+        console.log('[RHINE-THEME] 自动切换，viewTransition=' + (canVT ? 'supported' : 'unsupported'));
+        btn.click();
+      }, delay);
+      probe('切换前   ', -60);
+      probe('切换后150ms', 150);
+      probe('切换后400ms', 400);
+      probe('切换后900ms', 900);
+    }
+  }
+
+  function initMotion(ribbon) {
+    const root = document.documentElement;
+    const btn = $('#motionBtn'), state = $('#motionState');
+    const prefersReduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let on = !prefersReduce;
+    const apply = () => {
+      root.classList.toggle('no-anim', !on);
+      state.textContent = on ? 'ON' : 'OFF';
+      if (on) ribbon.start();
+      else { ribbon.stop(); ribbon.render(0.016); }
+    };
+    btn.addEventListener('click', () => { on = !on; apply(); });
+    apply();
+  }
+
+  /* ── 05 分幕 ───────────────────────────────────────────── */
+  const LINK_RE = /^(https?:\/\/|mailto:|[\w.+-]+@[\w-]+\.[\w.]{2,}$)/i;
+  const looksLikeLink = (v) => LINK_RE.test(String(v));
+  const hrefOf = (v) => {
+    const s = String(v);
+    return /^(https?:\/\/|mailto:)/i.test(s) ? s : 'mailto:' + s;
+  };
+
+  function renderStage(sections) {
+    const stage = $('#stage'), rail = $('#rail');
+    const pFrag = document.createDocumentFragment(), rFrag = document.createDocumentFragment();
+
+    sections.forEach((sec, si) => {
+      const panel = document.createElement('section');
+      panel.className = 'panel';
+      panel.id = 'sec-' + sec.id;
+      panel.dataset.shape = sec.shape;
+      panel.dataset.index = String(si);
+      panel.setAttribute('aria-label', sec.label || sec.cn || '');
+
+      /* 左栏：参数行 */
+      const side = document.createElement('div');
+      side.className = 'panel__side';
+      side.innerHTML =
+        '<div class="side__head" data-anim style="--d:60ms">' +
+          '<span class="mono-cap">' + esc((sec.label || '').split('·')[0].trim()) + '</span>' +
+          '<i class="rule"></i>' +
+        '</div>' +
+        (sec.lines || []).map((row, ri) =>
+          '<div class="side__row' + (looksLikeLink(row[1]) ? ' is-link' : '') + '" data-anim style="--d:' +
+          (140 + ri * 90) + 'ms">' +
+          '<span class="side__k">' + esc(row[0]) + '</span>' +
+          '<span class="side__v">' + (looksLikeLink(row[1])
+            ? '<a href="' + esc(hrefOf(row[1])) + '" target="_blank" rel="noopener">' + esc(row[1]) + '</a>'
+            : esc(row[1])) + '</span></div>').join('');
+
+      /* 中栏：主标题 */
+      const main = document.createElement('div');
+      main.className = 'panel__main';
+      const tailLabel = (sec.label || '').split('·').slice(1).join('·').trim() || sec.cn || '';
+      main.innerHTML =
+        '<div class="panel__label" data-anim style="--d:40ms">' +
+          '<span class="idx">[' + esc(sec.code) + ']</span>' +
+          '<span class="mono-cap">' + esc(tailLabel) + '</span>' +
+        '</div>' +
+        '<h2 class="panel__title" data-anim style="--d:120ms">' +
+          (Array.isArray(sec.title) ? sec.title : [sec.title])
+            .map((l) => '<span>' + esc(l) + '</span>').join('') +
+        '</h2>' +
+        '<p class="panel__sub" data-anim style="--d:250ms">' + esc(sec.sub || '') + '</p>' +
+        '<div class="panel__rule" data-anim style="--d:310ms"><i></i><i></i><i></i><i></i></div>' +
+        (si === 0
+          ? '<div class="scrollcue" data-anim style="--d:440ms"><i></i>' +
+            '<span>SCROLL TO CONTINUE / 向下滚动</span></div>'
+          : '');
+
+      const spacer = document.createElement('div');
+      spacer.className = 'panel__spacer';
+
+      panel.appendChild(side);
+      panel.appendChild(main);
+      panel.appendChild(spacer);
+      pFrag.appendChild(panel);
+
+      /* 左侧刻度导航 */
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'rail__item';
+      item.dataset.target = 'sec-' + sec.id;
+      item.innerHTML =
+        '<span class="rail__tick"></span>' +
+        '<span class="rail__code">' + esc(sec.code) + '</span>' +
+        '<span class="rail__cn">' + esc(sec.cn || '') + '</span>';
+      rFrag.appendChild(item);
+    });
+
+    stage.innerHTML = '';
+    stage.appendChild(pFrag);
+    rail.innerHTML = '';
+    rail.appendChild(rFrag);
+  }
+
+  /* 打字机 */
+  function typeInto(el, text, speed) {
+    if (!el) return;
+    if (el._twTimer) clearTimeout(el._twTimer);
+    let i = 0;
+    el.textContent = '';
+    el.classList.add('tw');
+    const step = () => {
+      el.textContent = text.slice(0, ++i);
+      if (i < text.length) el._twTimer = setTimeout(step, speed);
+      else el._twTimer = setTimeout(() => el.classList.remove('tw'), 1100);
+    };
+    step();
+  }
+
+  /* ── 06 档案卡 ─────────────────────────────────────────── */
+
+  function initCard() {
+    const card = $('#card');
+    const rowsEl = $('#profileRows');
+    const opName = $('#opName'), opSection = $('#opSection'), portraitLabel = $('#portraitLabel');
+    const keyInput = $('#keyInput'), keyBtn = $('#keyBtn'), keybar = $('.keybar');
+    const op = CFG.operator || {};
+    const auth = CFG.auth || {};
+
+    portraitLabel.textContent = op.portraitLabel || 'LOCKED';
+    const idlePlaceholder = auth.placeholder || 'ENTER AUTHORIZATION KEY';
+    keyInput.placeholder = idlePlaceholder;
+
+    /* 移动端：档案卡改成抽屉 */
+    if (window.matchMedia('(max-width: 1000px)').matches) {
+      const toggle = document.createElement('button');
+      toggle.className = 'cardtoggle';
+      toggle.type = 'button';
+      toggle.textContent = 'OPERATOR PROFILE';
+      toggle.addEventListener('click', () => {
+        const open = card.classList.toggle('is-open');
+        toggle.textContent = open ? 'CLOSE PROFILE' : 'OPERATOR PROFILE';
+      });
+      document.body.appendChild(toggle);
+    }
+
+    /* ── 授权状态机 ──────────────────────────────────────────
+     * 对照参考录屏：idle → verifying（细环 + 进度条，约 900ms）
+     *   口令错 → warning（黑橙硬切，默认 2600ms 后自动恢复，左侧日志记一笔）
+     *   口令对 → granted（保持通过态）
+     * 每次状态切换都会 version++ 并清掉旧定时器，避免快速连点把页面拉回旧状态。
+     * ──────────────────────────────────────────────────────── */
+    const correctKey = String(auth.key || 'RHINE').toUpperCase();
+    const holdMs = auth.holdMs || 2600;
+    const verifyMs = (function () {
+      const m = /[?&]verifyms=(\d+)/.exec(location.search);
+      return m ? parseInt(m[1], 10) : (auth.verifyMs || 900);
+    })();
+    const warnPanel = $('#warnPanel'), warnTick = $('#warnTick');
+    const evtList = $('#evtList'), botCn = $('#botCn'), botEn = $('#botEn');
+
+    let state = 'idle', version = 0, attempts = 0, warnTimer = 0;
+    const timers = new Set();
+    const events = [];
+
+    const evtClock = () => {
+      const d = new Date();
+      return pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds());
+    };
+    function logEvent(text, kind) {
+      events.push({ at: evtClock(), text: text, kind: kind || '' });
+      if (!evtList) return;
+      evtList.innerHTML = events.slice(-7).map((e) =>
+        '<li class="' + (e.kind === 'DENIED' ? 'is-deny' : e.kind === 'GRANTED' ? 'is-ok' : '') + '">' +
+          '<b>' + esc(e.at) + '</b><span>' + esc(e.text) + '</span></li>').join('');
+    }
+
+    /* 让 ∞ 跟着一起变暗／复原：改 --rib-lo 之后再让引擎重取一次调色板 */
+    const repaintRibbon = () => {
+      const rb = window.RHINE && window.RHINE.ribbon;
+      if (rb) { rb.paletteKey = ''; rb.rebuildPalette(); }
+    };
+
+    function enter(next) {
+      version++;
+      for (const t of timers) clearTimeout(t);
+      timers.clear();
+      if (warnTimer) { clearInterval(warnTimer); warnTimer = 0; }
+      state = next;
+      document.documentElement.setAttribute('data-state', next);
+      if (warnPanel) warnPanel.hidden = next !== 'warning';
+      if (next === 'warning') {
+        let left = holdMs / 1000;
+        if (warnTick) warnTick.textContent = left.toFixed(1) + 's';
+        warnTimer = setInterval(() => {
+          left = Math.max(0, left - 0.1);
+          if (warnTick) warnTick.textContent = left.toFixed(1) + 's';
+        }, 100);
+      }
+      repaintRibbon();
+    }
+    function after(ms, fn) {
+      const token = version;
+      const id = setTimeout(() => {
+        timers.delete(id);
+        if (token === version) fn();
+      }, ms);
+      timers.add(id);
+    }
+
+    function submitKey(k) {
+      if (state === 'verifying' || state === 'warning' || state === 'granted') return;
+      attempts++;
+      const n = pad2(attempts);
+      enter('verifying');
+      logEvent('VERIFY ' + n, 'verify');
+      keyInput.value = '';
+      keyInput.placeholder = 'VERIFYING IDENTITY…';
+      keyInput.readOnly = true;
+      keyBtn.innerHTML = 'PENDING <i>_</i>';
+      if (botCn) typeInto(botCn, '正在比对授权口令……', 45);
+      if (botEn) botEn.textContent = 'VERIFYING IDENTITY';
+
+      after(verifyMs, () => {
+        if (k === correctKey) {
+          enter('granted');
+          logEvent('GRANTED', 'GRANTED');
+          keyInput.value = 'KEY ' + k + ' · ACCESS GRANTED';
+          keyInput.readOnly = true;
+          keyBtn.textContent = (auth.granted || 'GRANTED') + ' ✓';
+          keyBtn.classList.add('is-granted');
+          if (botCn) typeInto(botCn, '授权通过，欢迎回来。', 45);
+          if (botEn) botEn.textContent = 'AUTHORIZATION KEY ACCEPTED';
+          if (portraitLabel) portraitLabel.textContent = 'AUTHORIZED';
+        } else {
+          logEvent('DENIED ' + n, 'DENIED');
+          enter('warning');
+          keyInput.value = '';
+          keyInput.placeholder = 'KEY REJECTED';
+          keyBtn.innerHTML = 'LOCKED <i>×</i>';
+          if (botCn) typeInto(botCn, '口令错误，会话已封锁。', 45);
+          if (botEn) botEn.textContent = 'ACCESS DENIED / SESSION SEALED';
+          after(holdMs, () => {
+            enter('idle');
+            keyInput.readOnly = false;
+            keyInput.value = '';
+            keyInput.placeholder = idlePlaceholder;
+            keyBtn.innerHTML = (auth.request || 'REQUEST') + ' <i>→</i>';
+            keyBtn.classList.remove('is-granted');
+            keyInput.focus();          /* 恢复后把光标放回输入框，可以直接重输 */
+            if (botCn) typeInto(botCn, '已恢复：' + holdMs / 1000 + ' 秒后自动解锁，左侧日志记下这次尝试。', 40);
+            if (botEn) botEn.textContent = 'RECOVERED / ATTEMPT LOGGED';
+          });
+        }
+      });
+    }
+
+    /* 开机即记一笔锁定事件 */
+    logEvent('LOCK ENGAGED', 'LOCK');
+
+    /* ── 授权输入：就是一个普通输入框，点哪儿都能直接打字 ──
+     * 之前要先点右边按钮才出现输入框，输入完右边那个按钮又没用 —— 已改成：
+     * 整条 keybar 都是输入区，回车或点 REQUEST 都能提交。 */
+    const readKey = () => keyInput.value.trim().toUpperCase();
+    const blocked = () => state === 'verifying' || state === 'warning' || state === 'granted';
+
+    keybar.addEventListener('click', () => { if (!blocked()) keyInput.focus(); });
+    keyInput.addEventListener('keydown', (e) => {
+      e.stopPropagation();                 /* 打字时别触发全站快捷键（t / 方向键等） */
+      if (e.key === 'Enter') {
+        const v = readKey();
+        if (!v) { keyInput.focus(); return; }
+        submitKey(v);
+      }
+    });
+    keyBtn.addEventListener('click', () => {
+      if (blocked()) return;
+      const v = readKey();
+      if (!v) { keyInput.focus(); return; }   /* 空的就先把光标放回输入框 */
+      submitKey(v);
+    });
+
+    /* 调试用：?authtest=wrong / ?authtest=right 会在 2.4s 时自动走一遍授权流程，
+       方便把截图卡在 VERIFYING 或 WARNING 那一帧。 */
+    const at = /[?&]authtest=(\w+)/.exec(location.search);
+    if (at) {
+      window.setTimeout(() => {
+        keyInput.value = at[1] === 'right' ? correctKey : 'WRONGKEY';
+        keyInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+        console.log('[RHINE-AUTH] 自动提交 ' + keyInput.value + '（正确口令 ' + correctKey + '）');
+      }, 2400);
+    }
+
+    function update(sec, instant) {
+      if (!sec) return;
+      const rows = sec.card || CFG.cardRows || [];
+      rowsEl.innerHTML =
+        '<h4>PROFILE / ' + esc(sec.cn || '') + '</h4>' +
+        '<dl>' + rows.map((r) =>
+          '<dt>' + esc(r.k) + '</dt><dd>' + esc(r.v) + '</dd>').join('') + '</dl>';
+      $$('dd', rowsEl).forEach((dd, i) => {
+        dd.style.animationDelay = (i * 65 + 40) + 'ms';
+        dd.classList.add('is-gain');
+      });
+      opName.textContent = op.name || 'OPERATOR';
+      opSection.textContent = op.section || '—';
+      const barCn = $('#botCn'), barEn = $('#botEn');
+      if (barCn) typeInto(barCn, sec.barCn || '', 40);
+      if (barEn) barEn.textContent = sec.barEn || '';
+      if (!instant) {
+        card.classList.remove('is-flash');
+        void card.offsetWidth;
+        card.classList.add('is-flash');
+        setTimeout(() => card.classList.remove('is-flash'), 700);
+      }
+    }
+
+    return { update };
+  }
+
+  /* ── 07 装配 ───────────────────────────────────────────── */
+  function ready(fn) {
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn);
+    else fn();
+  }
+
+/* 到这儿就得有痕迹：如果单文件版内联脚本出错，整段脚本一行都不会执行，
+   页面会静默卡在开场层。留个全局标记 + 兜底探针，方便无头 dump-dom 判断。
+   ?probe=1 时把每一步的诊断直接写进 <title> 和 DOM。 */
+(function () {
+  const Q = /[?&]probe=1/.test(location.search);
+  const said = [];
+  const say = (s) => {
+    said.push(s);
+    if (!Q) return;
+    try {
+      document.title = 'PROBE ' + said.join(' | ');
+      let el = document.getElementById('probe-out');
+      if (!el && document.body) {
+        el = document.createElement('div');
+        el.id = 'probe-out';
+        el.style.cssText = 'position:fixed;left:0;bottom:0;z-index:999;font-size:9px;color:#eb7510';
+        document.body.appendChild(el);
+      }
+      if (el) el.textContent = said.join(' | ');
+    } catch (e) {}
+  };
+  window.__RHINE_DIAG__ = say;
+  say('bootstrap-ok');
+  window.addEventListener('error', (e) => {
+    window.__RHINE_ERR__ = (e.message || e.type) + ' @' + (e.filename || '?') + ':' + (e.lineno || '?');
+    say('ERROR: ' + window.__RHINE_ERR__);
+  });
+  document.addEventListener('DOMContentLoaded', () => say('DOMContentLoaded'));
+  setTimeout(() => {
+    const b = document.getElementById('boot');
+    const log = document.getElementById('bootLog');
+    say('t+4s boot=' + (b ? b.className : 'no-boot') +
+        ' logLen=' + (log ? log.textContent.trim().length : -1) +
+        ' panels=' + document.querySelectorAll('.panel').length);
+  }, 4000);
+})();
+
+  ready(function () {
+    const sections = (CFG.sections || []).filter(Boolean);
+    if (!sections.length) return;
+
+    renderStage(sections);
+
+    /* 顶部 / 底部静态信息 */
+    const term = CFG.terminal || {};
+    const setText = (sel, v) => { const el = $(sel); if (el) el.textContent = v; };
+    setText('#tagSpecimen', term.specimen || '—');
+    setText('#tagOpus', term.opus || '—');
+    setText('#cardSponsor', term.sponsor || 'RHINE LAB LLC');
+    setText('#botTitle', ((CFG.operator && CFG.operator.section) || 'SEALED') + ' · SEALED SECTION');
+    const statusTag = $('#tagStatus');
+    if (statusTag) statusTag.innerHTML = 'SIGNAL <b>' + esc(term.signal || 'STABLE') + '</b>';
+
+    const card = initCard();
+    card.update(sections[0], true);
+    card.update(sections[0], true); /* 首屏不做闪烁 */
+
+    /* 画布 */
+    const ribbon = new Ribbon($('#ribbon'), {
+      shape: sections[0].shape || 'loop',
+      onFrame(payload) {
+        const label = $('#nodeLabel');
+        if (!label) return;
+        if (payload.hit) {
+          label.classList.add('is-on');
+          label.style.left = payload.hit.x + 'px';
+          label.style.top = payload.hit.y + 'px';
+          $('#nodeLabelId').textContent = String(payload.hit.k).padStart(3, '0');
+          $('#nodeLabelDepth').textContent = 'z ' + payload.hit.depth.toFixed(2);
+        } else {
+          label.classList.remove('is-on');
+        }
+      },
+    });
+    ribbon.render(0.016);
+    ribbon.start();
+
+    initClock();
+    initUptime();
+    initTheme(ribbon);
+    initMotion(ribbon);
+
+    /* — 滚动联动 — */
+    const panels = $$('.panel');
+    const railItems = $$('.rail__item');
+    let current = 0;
+    let lastSwitch = 0;      /* 上一次切幕的时刻，用来自适应形变时长 */
+
+    const goTo = (i) => {
+      const p = panels[clamp(i, 0, panels.length - 1)];
+      if (p) p.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+    railItems.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        goTo(panels.findIndex((p) => p.id === btn.dataset.target));
+      });
+    });
+    const toTop = $('#toTop');
+    if (toTop) toTop.addEventListener('click', () => goTo(0));
+
+    const activate = (i) => {
+      if (i === current || !panels[i]) return;
+      current = i;
+      panels.forEach((p, j) => p.classList.toggle('is-live', j === i));
+      railItems.forEach((b, j) => {
+        b.classList.toggle('is-active', j === i);
+        if (j === i) b.setAttribute('aria-current', 'true'); else b.removeAttribute('aria-current');
+      });
+      const sec = sections[i];
+      card.update(sec, false);
+      /* 形变时长按"这次要移动多远"定：行程越大给的时间越多，但整个切换必须
+         在 620–1400ms 内落地，这样连着快速翻幕时带子也永远追得上人眼看到的板块。 */
+      const now = performance.now();
+      const gap = lastSwitch ? now - lastSwitch : 9999;
+      lastSwitch = now;
+      if (sec.shape) {
+        ribbon.setShape(sec.shape, false, 900);
+        const travelPx = (ribbon.travel || 0) * Math.min(ribbon.w * 0.46, ribbon.h * 0.66);
+        const dur = clamp(travelPx / 900 * 1000, 620, 1400);
+        ribbon.morphDur = dur;
+      }
+    };
+
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((en) => {
+        if (en.isIntersecting) activate(parseInt(en.target.dataset.index, 10));
+      });
+    }, { threshold: 0.45 });
+    panels.forEach((p) => io.observe(p));
+
+    /* 首屏立即入场 */
+    panels[0].classList.add('is-live');
+    railItems.forEach((b, j) => { if (j === 0) b.classList.add('is-active'); });
+    current = 0;
+
+    /* — 键盘 — */
+    document.addEventListener('keydown', (e) => {
+      const tag = e.target && e.target.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      switch (e.key) {
+        case 'ArrowDown': case 'PageDown': case ' ':
+          e.preventDefault(); goTo(current + 1); break;
+        case 'ArrowUp': case 'PageUp':
+          e.preventDefault(); goTo(current - 1); break;
+        case 'Home': e.preventDefault(); goTo(0); break;
+        case 'End': e.preventDefault(); goTo(panels.length - 1); break;
+        case 't': case 'T': $('#themeBtn').click(); break;
+        case 'm': case 'M': $('#motionBtn').click(); break;
+      }
+    });
+
+    /* — 开场 — */
+    runBoot(() => {
+      ribbon.paletteKey = '';
+      ribbon.rebuildPalette();
+      /* 对照参考录屏：∞ 是"以笔触绘出"的，所以开幕时沿环路逐条画出来 */
+      const rm = /[?&]revealms=(\d+)/.exec(location.search);
+      ribbon.reveal(rm ? parseInt(rm[1], 10) : 1300);
+      ribbon.render(0.016);
+    });
+
+    /* 深链接（只在用户自己带 hash 进来时生效） */
+    if (location.hash && /^#sec-/.test(location.hash)) {
+      const target = panels.find((p) => '#' + p.id === location.hash);
+      if (target) setTimeout(() => target.scrollIntoView({ block: 'start' }), 80);
+    }
+
+    /* 调试用：?layout=1 量一遍五幕的"左栏参数行有没有压到大标题上"。
+       同一幕内两个盒子是否相交与滚动位置无关，所以不用滚动就能量全部五幕。 */
+    if (/[?&]layout=1/.test(location.search)) {
+      setTimeout(() => {
+        const hit = (a, b) => a.right > b.left + 1 && a.left < b.right - 1 &&
+                              a.bottom > b.top + 1 && a.top < b.bottom - 1;
+        panels.forEach((p, i) => {
+          const title = p.querySelector('.panel__title');
+          const main = p.querySelector('.panel__main');
+          const rows = Array.prototype.slice.call(p.querySelectorAll('.panel__side .side__v'));
+          let bad = 0;
+          rows.forEach((r) => {
+            const rb = r.getBoundingClientRect();
+            if (hit(rb, title.getBoundingClientRect()) || hit(rb, main.getBoundingClientRect())) bad++;
+            console.log('[RHINE-LAYOUT] 幕' + (i + 1) + '  ' + r.textContent.slice(0, 26) +
+              '  参数右边界=' + Math.round(rb.right) +
+              '  标题左边界=' + Math.round(title.getBoundingClientRect().left) +
+              '  标题栏左边界=' + Math.round(main.getBoundingClientRect().left) +
+              (hit(rb, main.getBoundingClientRect()) ? '  ← 压到了' : ''));
+          });
+          console.log('[RHINE-LAYOUT] 幕' + (i + 1) + ' 结论：' + (bad ? bad + ' 行压到标题' : '无重叠 ✓'));
+        });
+        /* 结果也写到底部状态栏上，这样不用滚动、不用抓 console，一张截图就能看结论 */
+        const summary = panels.map((p, i) => {
+          const title = p.querySelector('.panel__title').getBoundingClientRect();
+          const main = p.querySelector('.panel__main').getBoundingClientRect();
+          const rows = Array.prototype.slice.call(p.querySelectorAll('.panel__side .side__v'));
+          const n = rows.filter((r) => {
+            const rb = r.getBoundingClientRect();
+            const hitMain = rb.right > main.left + 1 && rb.left < main.right - 1 &&
+                            rb.bottom > main.top + 1 && rb.top < main.bottom - 1;
+            return hitMain || (rb.right > title.left + 1 && rb.left < title.right - 1 &&
+                               rb.bottom > title.top + 1 && rb.top < title.bottom - 1);
+          }).length;
+          return '幕' + (i + 1) + (n ? '✗' + n : '✓');
+        }).join(' ');
+        const en = $('#botEn');
+        if (en) en.textContent = 'LAYOUT ' + summary + '  吸附=' +
+          getComputedStyle(document.documentElement).scrollSnapType;
+        console.log('[RHINE-LAYOUT] 吸附 scroll-snap-type=' +
+          getComputedStyle(document.documentElement).scrollSnapType +
+          '  每幕 scroll-snap-align=' +
+          getComputedStyle(panels[0]).scrollSnapAlign);
+      }, 2800);
+    }
+
+    /* 调试用：?panel=4 在开场结束后直接跳到第 N 幕（0 基），方便截图检查某一幕。
+       这里刻意用瞬时跳转：无头截图在平滑滚动过程中会拍到空白帧。 */
+    const pm = /[?&]panel=(\d+)/.exec(location.search);
+    if (pm) {
+      const idx = clamp(parseInt(pm[1], 10), 0, panels.length - 1);
+      setTimeout(() => {
+        const p = panels[idx];
+        if (p) window.scrollTo({ top: p.offsetTop, behavior: 'auto' });
+      }, 2800);
+    }
+
+    window.RHINE = { ribbon: ribbon, sections: sections, goTo: goTo, activate: activate };
+
+    /* ── 压力自检：?stress=1 时按极端节奏狂切造型 ──────────────
+       用来验证"无论滑多快都要接得上"：切换间隔越压越短，
+       带子的进画位移会被记录（启动时请带 --enable-logging=stderr 看输出）。── */
+    if (/[?&]stress=1/.test(location.search)) {
+      window.__RHINE_JUMP_LOG__ = true;
+      ribbon._jumpMax = 0; ribbon._jumpSum = 0; ribbon._jumpN = 0; ribbon._jumps = 0;
+      setTimeout(function () {
+        if (!/[_]?stress|stress/.test(location.search)) { /* 双保险，别误触发 */ }
+        let i = 0;
+        console.log('[RHINE-JUMP] 压力测试开始（连续快切造型）');
+        const next = function () {
+          const idx = i % sections.length;
+          activate(idx);
+          i++;
+          if (i < 12) setTimeout(next, 400 + (i % 3) * 120);   /* 每 400~640ms 切一次，穿插"动画没走完就再切" */
+          else setTimeout(function () {
+            const r = ribbon;
+            const mean = r._jumpSum / Math.max(1, r._jumpN);
+            console.log('[RHINE-JUMP] 压力测试结束（12 次连续快切）: 帧 ' + r._jumpN +
+              ' 次  模型位移 max=' + r._jumpMax.toFixed(4) + ' mean=' + mean.toFixed(4) +
+              '  超限跳变 ' + r._jumps + ' 次  ' +
+              (r._jumps === 0 ? '✓ 全程连续，无瞬移' : '✗ 存在跳变'));
+          }, 700);
+        };
+        next();
+      }, 1500);
+    }
+
+    /* ── 无头自检：加 ?probe=1 时把布局度量写进 <title>，
+       配合 `msedge --dump-dom` + 文件重定向即可读到（本机没有其他探针手段）。── */
+    if (/[?&]probe=1/.test(location.search)) {
+      setTimeout(function () {
+        const t = $('.panel__title');
+        const info = [
+          'vw=' + window.innerWidth,
+          'vh=' + window.innerHeight,
+          'docH=' + document.documentElement.scrollHeight,
+          'scrollY=' + Math.round(window.scrollY),
+          'cardTop=' + Math.round($('#card').getBoundingClientRect().top),
+          'cardH=' + Math.round($('#card').getBoundingClientRect().height),
+          'titleTop=' + (t ? Math.round(t.getBoundingClientRect().top) : 'n/a'),
+          'titleH=' + (t ? Math.round(t.getBoundingClientRect().height) : 'n/a'),
+          'titleW=' + (t ? Math.round(t.getBoundingClientRect().width) : 'n/a'),
+          'canvas=' + ribbon.cv.width + 'x' + ribbon.cv.height,
+          'sliceN=' + ribbon.sliceN,
+          'rail=' + $$('.rail__item').length,
+          'panels=' + $$('.panel').length,
+          'side=' + Math.round(($('.panel__side') || { getBoundingClientRect: () => ({ width: -1 }) }).getBoundingClientRect().width),
+        ].join(' ');
+        document.title = 'PROBE ' + info;
+        const mark = document.createElement('div');
+        mark.id = 'probe-out';
+        mark.style.cssText = 'position:fixed;left:0;bottom:0;z-index:999;font-size:9px';
+        mark.textContent = info;
+        document.body.appendChild(mark);
+      }, 500);
+    }
+
+    /* 让 window.RHINE 直接带上诊断信息，无头 dump-dom 可以直接读 */
+    window.RHINE.ready = true;
+    window.RHINE.loadedAt = new Date().toISOString();
+  });
+})();
+
+})();
+</script>
+</body>
+</html>
